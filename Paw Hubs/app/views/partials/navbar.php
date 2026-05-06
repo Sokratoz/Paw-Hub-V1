@@ -126,7 +126,7 @@ $profileSrc = $profileImage && $profileImage !== 'default.png'
     color: #718096;
     font-size: 12px;
     font-weight: 600;
-    margin-top: 1px;
+    margin-top: 2px;
 }
 
 .nav-links {
