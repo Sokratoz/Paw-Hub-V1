@@ -61,25 +61,44 @@ class HomeController extends Controller {
 
         $recommendedProducts = [
             [
-                'name' => 'Premium Adult Dog Food',
-                'meta' => 'High protein - 2kg',
+                'name' => 'Premium Dog Food',
+                'meta' => 'High-protein blend for active dogs',
                 'price' => 'EGP 350',
                 'image' => 'bag.png',
-                'tone' => 'teal'
+                'tone' => 'teal',
+                'rating' => '4.9'
             ],
             [
-                'name' => 'Omega 3 Fish Oil',
-                'meta' => 'For healthy skin & coat',
+                'name' => 'Squeaky Plush Toy',
+                'meta' => 'Soft chew-friendly playtime favorite',
                 'price' => 'EGP 180',
                 'image' => 'heart.png',
-                'tone' => 'green'
+                'tone' => 'green',
+                'rating' => '4.8'
             ],
             [
-                'name' => 'Chew Rope Toy',
-                'meta' => 'Durable & safe',
+                'name' => 'Adjustable Pet Collar',
+                'meta' => 'Comfort fit with premium buckle',
                 'price' => 'EGP 120',
                 'image' => 'paw.png',
-                'tone' => 'blue'
+                'tone' => 'blue',
+                'rating' => '4.7'
+            ],
+            [
+                'name' => 'Soft Cozy Pet Bed',
+                'meta' => 'Cloud-soft rest spot for naps',
+                'price' => 'EGP 420',
+                'image' => 'Welcome.png',
+                'tone' => 'olive',
+                'rating' => '4.9'
+            ],
+            [
+                'name' => 'Durable Rope Toy',
+                'meta' => 'Strong braided rope for tug play',
+                'price' => 'EGP 120',
+                'image' => 'paw.png',
+                'tone' => 'teal',
+                'rating' => '4.6'
             ]
         ];
 
