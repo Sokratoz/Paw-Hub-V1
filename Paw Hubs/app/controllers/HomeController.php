@@ -59,48 +59,8 @@ class HomeController extends Controller {
             'loyalty_points' => $this->loyaltyPoints($db, $userId)
         ];
 
-        $recommendedProducts = [
-            [
-                'name' => 'Premium Dog Food',
-                'meta' => 'High-protein blend for active dogs',
-                'price' => 'EGP 350',
-                'image' => 'bag.png',
-                'tone' => 'teal',
-                'rating' => '4.9'
-            ],
-            [
-                'name' => 'Squeaky Plush Toy',
-                'meta' => 'Soft chew-friendly playtime favorite',
-                'price' => 'EGP 180',
-                'image' => 'heart.png',
-                'tone' => 'green',
-                'rating' => '4.8'
-            ],
-            [
-                'name' => 'Adjustable Pet Collar',
-                'meta' => 'Comfort fit with premium buckle',
-                'price' => 'EGP 120',
-                'image' => 'paw.png',
-                'tone' => 'blue',
-                'rating' => '4.7'
-            ],
-            [
-                'name' => 'Soft Cozy Pet Bed',
-                'meta' => 'Cloud-soft rest spot for naps',
-                'price' => 'EGP 420',
-                'image' => 'Welcome.png',
-                'tone' => 'olive',
-                'rating' => '4.9'
-            ],
-            [
-                'name' => 'Durable Rope Toy',
-                'meta' => 'Strong braided rope for tug play',
-                'price' => 'EGP 120',
-                'image' => 'paw.png',
-                'tone' => 'teal',
-                'rating' => '4.6'
-            ]
-        ];
+        // Fetch recommended marketplace products dynamically from MySQL.
+        $recommendedProducts = $this->recommendedMarketplaceItems($db);
 
         $this->view('home', [
             'user' => $user,
@@ -121,6 +81,37 @@ class HomeController extends Controller {
         $stmt = $db->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    private function recommendedMarketplaceItems($db, $limit = 5) {
+        if (!$this->tableExists($db, 'marketplace_items')) {
+            return [];
+        }
+
+        $sql = "
+            SELECT id, name, short_description, price, rating, image, category, stock
+            FROM marketplace_items
+            WHERE is_recommended = 1
+            ORDER BY rating DESC
+            LIMIT " . (int) $limit;
+
+        $rows = $this->fetchAll($db, $sql);
+        $items = [];
+
+        foreach ($rows as $row) {
+            $items[] = [
+                'id' => (int) ($row['id'] ?? 0),
+                'name' => $row['name'] ?? 'Pet Product',
+                'meta' => $row['short_description'] ?? '',
+                'price' => 'EGP ' . number_format((float) ($row['price'] ?? 0), 0),
+                'image' => trim((string) ($row['image'] ?? '')),
+                'rating' => number_format((float) ($row['rating'] ?? 0), 1),
+                'category' => $row['category'] ?? '',
+                'stock' => (int) ($row['stock'] ?? 0),
+            ];
+        }
+
+        return $items;
     }
 
     private function tableExists($db, $table) {

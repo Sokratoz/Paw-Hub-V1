@@ -317,6 +317,20 @@ class Database {
           `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
           PRIMARY KEY (`id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+        CREATE TABLE IF NOT EXISTS `marketplace_items` (
+          `id` int(11) NOT NULL AUTO_INCREMENT,
+          `name` varchar(255) NOT NULL,
+          `short_description` text DEFAULT NULL,
+          `price` decimal(10,2) NOT NULL DEFAULT 0.00,
+          `category` varchar(100) DEFAULT NULL,
+          `image` varchar(255) DEFAULT NULL,
+          `rating` decimal(2,1) NOT NULL DEFAULT 0.0,
+          `stock` int(11) NOT NULL DEFAULT 0,
+          `is_recommended` tinyint(1) NOT NULL DEFAULT 1,
+          `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+          PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         ";
         
         $this->connection->exec($sql);
@@ -375,6 +389,17 @@ class Database {
         $this->addColumnIfMissing('orders', 'availability_status', "`availability_status` varchar(20) NOT NULL DEFAULT 'pending' AFTER `total_price`");
         $this->addColumnIfMissing('orders', 'status', "`status` varchar(20) NOT NULL DEFAULT 'pending' AFTER `availability_status`");
         $this->addColumnIfMissing('orders', 'is_recurring', "`is_recurring` tinyint(1) NOT NULL DEFAULT 0 AFTER `status`");
+
+        $this->addColumnIfMissing('marketplace_items', 'name', "`name` varchar(255) NOT NULL DEFAULT '' AFTER `id`");
+        $this->addColumnIfMissing('marketplace_items', 'short_description', "`short_description` text DEFAULT NULL AFTER `name`");
+        $this->addColumnIfMissing('marketplace_items', 'price', "`price` decimal(10,2) NOT NULL DEFAULT 0.00 AFTER `short_description`");
+        $this->addColumnIfMissing('marketplace_items', 'category', "`category` varchar(100) DEFAULT NULL AFTER `price`");
+        $this->addColumnIfMissing('marketplace_items', 'image', "`image` varchar(255) DEFAULT NULL AFTER `category`");
+        $this->addColumnIfMissing('marketplace_items', 'rating', "`rating` decimal(2,1) NOT NULL DEFAULT 0.0 AFTER `image`");
+        $this->addColumnIfMissing('marketplace_items', 'stock', "`stock` int(11) NOT NULL DEFAULT 0 AFTER `rating`");
+        $this->addColumnIfMissing('marketplace_items', 'is_recommended', "`is_recommended` tinyint(1) NOT NULL DEFAULT 1 AFTER `stock`");
+        $this->addColumnIfMissing('marketplace_items', 'created_at', "`created_at` timestamp NOT NULL DEFAULT current_timestamp() AFTER `is_recommended`");
+        $this->seedMarketplaceItems();
 
         if ($this->tableExists('activity_lists')) {
             $this->addColumnIfMissing('activity_lists', 'occurred_at', "`occurred_at` timestamp NOT NULL DEFAULT current_timestamp()");
@@ -599,6 +624,114 @@ class Database {
                     $insert->execute([$vetId, $actionKey, $mode]);
                 }
             }
+        }
+    }
+
+    private function seedMarketplaceItems() {
+        if (!$this->tableExists('marketplace_items')) {
+            return;
+        }
+
+        $items = [
+            [
+                'name' => 'Premium Dog Food',
+                'short_description' => 'High-protein blend for active dogs',
+                'price' => 520.00,
+                'category' => 'Food',
+                'image' => 'premium-dog-food.png',
+                'rating' => 4.8,
+                'stock' => 20,
+                'is_recommended' => 1,
+            ],
+            [
+                'name' => 'Squeaky Plush Toy',
+                'short_description' => 'Soft chew-friendly playtime favorite',
+                'price' => 120.00,
+                'category' => 'Toys',
+                'image' => 'squeaky-plush-toy.png',
+                'rating' => 4.6,
+                'stock' => 30,
+                'is_recommended' => 1,
+            ],
+            [
+                'name' => 'Adjustable Pet Collar',
+                'short_description' => 'Comfort fit with premium buckle',
+                'price' => 95.00,
+                'category' => 'Accessories',
+                'image' => 'adjustable-pet-collar.png',
+                'rating' => 4.7,
+                'stock' => 25,
+                'is_recommended' => 1,
+            ],
+            [
+                'name' => 'Soft Cozy Pet Bed',
+                'short_description' => 'Cloud-soft rest spot for naps',
+                'price' => 450.00,
+                'category' => 'Beds',
+                'image' => 'soft-cozy-pet-bed.png',
+                'rating' => 4.9,
+                'stock' => 12,
+                'is_recommended' => 1,
+            ],
+            [
+                'name' => 'Durable Rope Toy',
+                'short_description' => 'Strong braided rope for tug play',
+                'price' => 110.00,
+                'category' => 'Toys',
+                'image' => 'durable-rope-toy.png',
+                'rating' => 4.5,
+                'stock' => 18,
+                'is_recommended' => 1,
+            ],
+        ];
+
+        $insert = $this->connection->prepare("
+            INSERT INTO `marketplace_items`
+                (`name`, `short_description`, `price`, `category`, `image`, `rating`, `stock`, `is_recommended`)
+            VALUES
+                (:name, :short_description, :price, :category, :image, :rating, :stock, :is_recommended)
+        ");
+        $update = $this->connection->prepare("
+            UPDATE `marketplace_items`
+            SET `short_description` = :short_description,
+                `price` = :price,
+                `category` = :category,
+                `image` = :image,
+                `rating` = :rating,
+                `stock` = :stock,
+                `is_recommended` = :is_recommended
+            WHERE `id` = :id
+        ");
+        $check = $this->connection->prepare("SELECT id FROM `marketplace_items` WHERE `name` = ? LIMIT 1");
+
+        foreach ($items as $item) {
+            $check->execute([$item['name']]);
+            $existingId = $check->fetchColumn();
+
+            if ($existingId) {
+                $update->execute([
+                    'short_description' => $item['short_description'],
+                    'price' => $item['price'],
+                    'category' => $item['category'],
+                    'image' => $item['image'],
+                    'rating' => $item['rating'],
+                    'stock' => $item['stock'],
+                    'is_recommended' => $item['is_recommended'],
+                    'id' => $existingId,
+                ]);
+                continue;
+            }
+
+            $insert->execute([
+                'name' => $item['name'],
+                'short_description' => $item['short_description'],
+                'price' => $item['price'],
+                'category' => $item['category'],
+                'image' => $item['image'],
+                'rating' => $item['rating'],
+                'stock' => $item['stock'],
+                'is_recommended' => $item['is_recommended'],
+            ]);
         }
     }
 }

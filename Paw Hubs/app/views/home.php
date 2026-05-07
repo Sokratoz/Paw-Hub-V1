@@ -427,11 +427,14 @@
             display: grid;
             grid-template-columns: minmax(0, 1fr) minmax(320px, 520px);
             gap: 28px;
-            align-items: center;
+            align-items: stretch;
         }
 
         .marketplace-copy {
             padding: 10px 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
 
         .marketplace-label {
@@ -521,16 +524,25 @@
             box-shadow: 0 22px 44px rgba(23, 179, 163, 0.26);
         }
 
-        .marketplace-visual {
+        .marketplace-card {
             position: relative;
-            min-height: 520px;
-            border-radius: 38px 38px 38px 120px;
             overflow: hidden;
+            border-radius: 40px;
+            height: 100%;
             box-shadow: 0 26px 60px rgba(23, 50, 77, 0.12);
             background: linear-gradient(160deg, #f3ece3 0%, #fdf8f3 100%);
         }
 
-        .marketplace-visual img {
+        .marketplace-image-wrapper {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            min-height: 650px;
+            overflow: hidden;
+            border-radius: 40px;
+        }
+
+        .marketplace-image-wrapper img {
             width: 100%;
             height: 100%;
             object-fit: cover;
@@ -624,25 +636,28 @@
             box-shadow: 0 24px 42px rgba(28, 54, 74, 0.12);
         }
 
-        .market-card-media {
+        .product-image-wrapper {
             position: relative;
-            height: 170px;
-            border-radius: 22px;
-            background: linear-gradient(180deg, #f6fbfa 0%, #edf5f4 100%);
-            display: grid;
-            place-items: center;
+            width: 100%;
+            height: 240px;
             overflow: hidden;
+            border-radius: 24px;
+            background: #f4f7f6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        .market-card-media img {
-            width: 72%;
-            height: 72%;
-            object-fit: contain;
-            transition: transform 0.28s ease;
+        .product-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: 0.4s ease;
+            display: block;
         }
 
-        .market-card:hover .market-card-media img {
-            transform: scale(1.06);
+        .market-card:hover .product-image {
+            transform: scale(1.05);
         }
 
         .market-wishlist {
@@ -662,6 +677,14 @@
 
         .market-card-body {
             padding-top: 16px;
+        }
+
+        .market-image-debug {
+            margin: 10px 0 0;
+            color: #8a98a8;
+            font-size: 12px;
+            line-height: 1.4;
+            word-break: break-all;
         }
 
         .market-card-body h4 {
@@ -1213,8 +1236,13 @@
                 font-size: 16px;
             }
 
-            .marketplace-visual {
+            .marketplace-card {
+                border-radius: 28px;
+            }
+
+            .marketplace-image-wrapper {
                 min-height: 380px;
+                height: 380px;
                 border-radius: 28px 28px 28px 72px;
             }
 
@@ -1441,11 +1469,13 @@ $displayPets = array_slice($pets, 0, 2);
                 <a href="#" class="marketplace-cta">Explore Marketplace <i class="fas fa-arrow-right"></i></a>
             </div>
 
-            <div class="marketplace-visual">
-                <img src="images/Welcome.png" alt="Premium pet marketplace hero">
-                <div class="marketplace-float">
-                    <i class="fas fa-heart"></i>
-                    <strong>Happy pets,<br>happy life!</strong>
+            <div class="marketplace-card">
+                <div class="marketplace-image-wrapper">
+                    <img src="images/Pet Marketplace.png" alt="Premium pet marketplace hero">
+                    <div class="marketplace-float">
+                        <i class="fas fa-heart"></i>
+                        <strong>Happy pets,<br>happy life!</strong>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1459,16 +1489,23 @@ $displayPets = array_slice($pets, 0, 2);
             <div class="marketplace-grid">
                 <?php foreach ($recommendedProducts as $product): ?>
                     <article class="market-card">
-                        <div class="market-card-media">
+                        <?php $productImage = !empty($product['image']) ? trim($product['image']) : 'default-product.png'; ?>
+                        <div class="product-image-wrapper">
                             <button class="market-wishlist" type="button" aria-label="Add <?= htmlspecialchars($product['name']) ?> to wishlist">
                                 <i class="fas fa-heart"></i>
                             </button>
-                            <img src="images/<?= htmlspecialchars($product['image']) ?>" alt="<?= htmlspecialchars($product['name']) ?>">
+                            <img
+                                src="uploads/marketplace/<?= htmlspecialchars($productImage) ?>"
+                                alt="<?= htmlspecialchars($product['name']) ?>"
+                                class="product-image"
+                                onerror="this.onerror=null;this.src='uploads/marketplace/default-product.png';"
+                            >
                         </div>
 
                         <div class="market-card-body">
                             <h4><?= htmlspecialchars($product['name']) ?></h4>
                             <p><?= htmlspecialchars($product['meta']) ?></p>
+                            <p class="market-image-debug"><?= htmlspecialchars('uploads/marketplace/' . $productImage) ?></p>
                             <div class="market-rating">
                                 <i class="fas fa-star"></i>
                                 <?= htmlspecialchars($product['rating'] ?? '4.8') ?>
