@@ -31,6 +31,26 @@ if (isset($_SESSION['user_id'])) {
 $profileSrc = $profileImage && $profileImage !== 'default.png'
     ? asset('uploads/' . $profileImage)
     : asset('images/guest.png');
+
+$notifications = [];
+$notificationCount = 0;
+if (isset($_SESSION['user_id'])) {
+    try {
+        $stmt = $db->prepare(
+            "SELECT id, title, message, type, is_read, created_at
+             FROM notifications
+             WHERE user_id = ?
+             ORDER BY created_at DESC
+             LIMIT 10"
+        );
+        $stmt->execute([$_SESSION['user_id']]);
+        $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $notificationCount = count(array_filter($notifications, fn($row) => (int) $row['is_read'] === 0));
+    } catch (Exception $e) {
+        $notifications = [];
+        $notificationCount = 0;
+    }
+}
 ?>
 <nav class="navbar">
   <div class="nav-container">
@@ -64,7 +84,35 @@ $profileSrc = $profileImage && $profileImage !== 'default.png'
     </ul>
 
     <div class="nav-right">
-      <button class="icon-btn" type="button" aria-label="Notifications"><i class="far fa-bell"></i></button>
+      <div class="notifications-wrapper">
+        <button id="notificationToggle" class="icon-btn" type="button" aria-label="Notifications" aria-expanded="false">
+            <i class="far fa-bell"></i>
+            <?php if (!empty($notificationCount)): ?>
+                <span class="badge"><?= (int) $notificationCount ?></span>
+            <?php endif; ?>
+        </button>
+        <div class="notifications-dropdown" id="notificationsDropdown" aria-hidden="true">
+            <div class="notification-card-header">
+                <strong>Notifications</strong>
+                <span><?= htmlspecialchars($notificationCount) ?> unread</span>
+            </div>
+            <div class="notification-list">
+                <?php if (empty($notifications)): ?>
+                    <div class="notification-empty">No new notifications yet.</div>
+                <?php else: ?>
+                    <?php foreach ($notifications as $notification): ?>
+                        <article class="notification-item <?= $notification['is_read'] ? '' : 'unread' ?>">
+                            <div class="notification-body">
+                                <div class="notification-title"><?= htmlspecialchars($notification['title']) ?></div>
+                                <div class="notification-message"><?= htmlspecialchars($notification['message']) ?></div>
+                            </div>
+                            <small class="notification-time"><?= htmlspecialchars(date('M j, g:i A', strtotime($notification['created_at']))) ?></small>
+                        </article>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+        </div>
+      </div>
       <div class="profile" id="profileToggle">
         <img src="<?= htmlspecialchars($profileSrc) ?>" alt="profile">
         <div class="profile-info">
@@ -210,6 +258,117 @@ $profileSrc = $profileImage && $profileImage !== 'default.png'
     color: #94CDD3;
 }
 
+.notifications-wrapper {
+    position: relative;
+}
+
+.notifications-wrapper .badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: #ef476f;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.notifications-dropdown {
+    position: absolute;
+    top: calc(100% + 12px);
+    right: 0;
+    width: 360px;
+    max-height: 420px;
+    overflow: hidden;
+    background: rgba(255,255,255,0.95);
+    backdrop-filter: blur(16px);
+    box-shadow: 0 28px 80px rgba(45, 68, 98, 0.16);
+    border: 1px solid rgba(255,255,255,0.75);
+    border-radius: 22px;
+    transform: translateY(-10px);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.25s ease, transform 0.25s ease, visibility 0.25s;
+    z-index: 1001;
+}
+
+.notifications-dropdown.open {
+    transform: translateY(0);
+    opacity: 1;
+    visibility: visible;
+}
+
+.notification-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 18px 20px;
+    border-bottom: 1px solid rgba(160, 214, 189, 0.45);
+}
+
+.notification-card-header strong {
+    font-size: 15px;
+    color: #194d3b;
+}
+
+.notification-card-header span {
+    font-size: 13px;
+    color: #4f6f64;
+}
+
+.notification-list {
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.notification-item {
+    padding: 16px 20px;
+    display: grid;
+    gap: 8px;
+    border-bottom: 1px solid rgba(115, 168, 146, 0.16);
+    transition: background 0.2s ease;
+}
+
+.notification-item:hover {
+    background: rgba(174, 233, 208, 0.25);
+}
+
+.notification-item.unread {
+    background: rgba(249, 238, 255, 0.7);
+}
+
+.notification-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1f4f3a;
+}
+
+.notification-message {
+    font-size: 13px;
+    color: #576863;
+    line-height: 1.5;
+}
+
+.notification-time {
+    display: block;
+    font-size: 12px;
+    color: #7c8d82;
+}
+
+.notification-empty {
+    padding: 24px 20px;
+    text-align: center;
+    color: #58756c;
+    font-size: 14px;
+}
+
 /* Dropdown */
 .dropdown {
     position: absolute;
@@ -306,13 +465,54 @@ $profileSrc = $profileImage && $profileImage !== 'default.png'
 <script>
 const profileToggle = document.getElementById('profileToggle');
 const dropdownMenu = document.getElementById('dropdownMenu');
+const notificationToggle = document.getElementById('notificationToggle');
+const notificationsDropdown = document.getElementById('notificationsDropdown');
 
 profileToggle.onclick = function(e) {
     e.stopPropagation();
     dropdownMenu.classList.toggle('show');
+    notificationsDropdown.classList.remove('open');
+    if (notificationToggle) {
+        notificationToggle.setAttribute('aria-expanded', 'false');
+        notificationsDropdown.setAttribute('aria-hidden', 'true');
+    }
+}
+
+if (notificationToggle && notificationsDropdown) {
+    notificationToggle.onclick = function(e) {
+        e.stopPropagation();
+        const isOpen = notificationsDropdown.classList.toggle('open');
+        notificationToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        notificationsDropdown.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+
+        if (isOpen) {
+            dropdownMenu.classList.remove('show');
+            const badge = notificationToggle.querySelector('.badge');
+            if (badge) {
+                fetch('index.php?url=notifications/markRead', { method: 'POST' })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            badge.remove();
+                            const statusLabel = notificationsDropdown.querySelector('.notification-card-header span');
+                            if (statusLabel) {
+                                statusLabel.textContent = '0 unread';
+                            }
+                            document.querySelectorAll('.notification-item.unread').forEach(item => item.classList.remove('unread'));
+                        }
+                    })
+                    .catch(() => {});
+            }
+        }
+    }
 }
 
 document.onclick = function() {
     dropdownMenu.classList.remove('show');
+    if (notificationsDropdown) {
+        notificationsDropdown.classList.remove('open');
+        notificationToggle && notificationToggle.setAttribute('aria-expanded', 'false');
+        notificationsDropdown.setAttribute('aria-hidden', 'true');
+    }
 }
 </script>

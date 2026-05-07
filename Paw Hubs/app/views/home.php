@@ -81,6 +81,19 @@
             flex-wrap: wrap;
         }
 
+        .notification-banner {
+            max-width: 1120px;
+            margin: 0 auto 24px;
+            padding: 18px 22px;
+            border-radius: 18px;
+            background: linear-gradient(135deg, #daf7ed, #eafbf2);
+            border: 1px solid #c8e9d9;
+            color: #1f4e3b;
+            font-weight: 700;
+            box-shadow: 0 14px 30px rgba(45, 123, 98, 0.08);
+            text-align: center;
+        }
+
         .btn {
             min-height: 54px;
             padding: 0 26px;
@@ -1321,6 +1334,20 @@
 <?php require_once '../app/views/partials/navbar.php'; ?>
 
 <?php
+$homeNotification = '';
+if (!empty($_SESSION['flash_success'])) {
+    $homeNotification = trim($_SESSION['flash_success']);
+    unset($_SESSION['flash_success']);
+} elseif (isset($_SESSION['user_id'])) {
+    $firstName = explode(' ', trim($_SESSION['username'] ?? ''))[0] ?: 'there';
+    $homeNotification = "Welcome back, " . htmlspecialchars($firstName) . "!";
+}
+?>
+<?php if ($homeNotification): ?>
+    <div class="notification-banner"><?= htmlspecialchars($homeNotification) ?></div>
+<?php endif; ?>
+
+<?php
 $username = isset($username) ? $username : ($_SESSION['username'] ?? 'Guest');
 $pets = isset($pets) && is_array($pets) ? $pets : [];
 $stats = isset($stats) && is_array($stats) ? $stats : [
@@ -1489,23 +1516,27 @@ $displayPets = array_slice($pets, 0, 2);
             <div class="marketplace-grid">
                 <?php foreach ($recommendedProducts as $product): ?>
                     <article class="market-card">
-                        <?php $productImage = !empty($product['image']) ? trim($product['image']) : 'default-product.png'; ?>
+                        <?php
+                            $productImage = !empty($product['image']) ? trim($product['image']) : 'default-product.png';
+                            $productImage = strtolower(preg_replace('/\s+/', '-', $productImage));
+                            $productImage = preg_replace('/[^a-z0-9\-_.]/', '', $productImage);
+                        ?>
                         <div class="product-image-wrapper">
                             <button class="market-wishlist" type="button" aria-label="Add <?= htmlspecialchars($product['name']) ?> to wishlist">
                                 <i class="fas fa-heart"></i>
                             </button>
                             <img
-                                src="uploads/marketplace/<?= htmlspecialchars($productImage) ?>"
+                                src="images/marketplace/<?= htmlspecialchars($productImage) ?>"
                                 alt="<?= htmlspecialchars($product['name']) ?>"
                                 class="product-image"
-                                onerror="this.onerror=null;this.src='uploads/marketplace/default-product.png';"
+                                onerror="this.onerror=null;this.src='images/marketplace/default-product.png';"
                             >
                         </div>
 
                         <div class="market-card-body">
                             <h4><?= htmlspecialchars($product['name']) ?></h4>
                             <p><?= htmlspecialchars($product['meta']) ?></p>
-                            <p class="market-image-debug"><?= htmlspecialchars('uploads/marketplace/' . $productImage) ?></p>
+                            <p class="market-image-debug"><?= htmlspecialchars('images/marketplace/' . $productImage) ?></p>
                             <div class="market-rating">
                                 <i class="fas fa-star"></i>
                                 <?= htmlspecialchars($product['rating'] ?? '4.8') ?>

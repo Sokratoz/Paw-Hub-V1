@@ -28,6 +28,14 @@ class AuthController extends Controller {
                 $_SESSION['username']    = $user['username'];
                 $_SESSION['role']        = $user['role'];
                 $_SESSION['profile_pic'] = $user['image'] ?? 'default.png';
+                $_SESSION['flash_success'] = "Welcome back, " . explode(' ', trim($user['username']))[0] . "!";
+
+                $this->insertNotification(
+                    $user['id'],
+                    "Welcome back, " . $user['username'] . " 👋",
+                    'We are happy to see you again.',
+                    'login'
+                );
 
                 $this->authService->recordLogin($user['id']);
                 $this->redirectBasedOnRole($user['role']);
@@ -127,7 +135,15 @@ class AuthController extends Controller {
                 $_SESSION['username'] = $createdUser['username'];
                 $_SESSION['role'] = $createdUser['role'] ?? $data['role'];
                 $_SESSION['profile_pic'] = $createdUser['image'] ?? $data['image'];
-                $_SESSION['flash_success'] = "Account created successfully.";
+                $_SESSION['flash_success'] = "Welcome to Paw Hubs, " . explode(' ', trim($createdUser['username']))[0] . "! Your account is ready.";
+
+                $this->insertNotification(
+                    $result['id'],
+                    'Welcome to Paw Hubs 🎉',
+                    'Your account has been created successfully.',
+                    'welcome'
+                );
+
                 $this->redirectBasedOnRole($_SESSION['role']);
             } else {
                 $errors[] = "Account could not be created. Please check your details and try again.";
@@ -165,6 +181,18 @@ class AuthController extends Controller {
             $_SESSION['username'] = $user['username'];
             $_SESSION['role'] = $user['role'];
             $_SESSION['profile_pic'] = $user['image'] ?? 'default.png';
+        }
+    }
+
+    private function insertNotification($userId, $title, $message, $type) {
+        try {
+            $db = Database::getInstance()->getConnection();
+            $stmt = $db->prepare(
+                "INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, ?)"
+            );
+            $stmt->execute([$userId, $title, $message, $type]);
+        } catch (PDOException $e) {
+            // keep auth flow working even if notifications fail
         }
     }
 
