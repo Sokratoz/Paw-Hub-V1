@@ -2,14 +2,10 @@
 
 class ClinicalController extends Controller {
     public function labHub() {
-        if (!isset($_SESSION['user_id'])) {
-            header("Location: index.php?url=auth/login");
-            exit;
-        }
-
+        $user = $this->requireAuth(['vet', 'admin']);
         $db = Database::getInstance()->getConnection();
-        $role = $_SESSION['role'] ?? 'pet_owner';
-        $userId = (int) $_SESSION['user_id'];
+        $role = $user['role'] ?? 'vet';
+        $userId = (int) $user['id'];
         $vet = $this->fetchOne($db, "SELECT id FROM veterinarians WHERE user_id = ?", [$userId]);
         $owner = $this->fetchOne($db, "SELECT id FROM pet_owners WHERE user_id = ?", [$userId]);
         $vetId = $role === 'vet' ? (int) ($vet['id'] ?? 0) : null;
@@ -44,16 +40,8 @@ class ClinicalController extends Controller {
     }
 
     public function index() {
-        if (!isset($_SESSION['user_id'])) {
-            header("Location: index.php?url=auth/login");
-            exit;
-        }
-
-        $role = $_SESSION['role'] ?? 'pet_owner';
-        if (!in_array($role, ['admin', 'vet'], true)) {
-            http_response_code(403);
-            die("Access denied. Clinical Operations is available for admins and vets only.");
-        }
+        $user = $this->requireAuth(['admin', 'vet']);
+        $role = $user['role'] ?? 'vet';
 
         if ($role === 'admin') {
             header("Location: index.php?url=admin/clinical");
@@ -61,7 +49,7 @@ class ClinicalController extends Controller {
         }
 
         $db = Database::getInstance()->getConnection();
-        $userId = $_SESSION['user_id'];
+        $userId = (int) $user['id'];
         $vet = $this->fetchOne($db, "SELECT id FROM veterinarians WHERE user_id = ?", [$userId]);
         $vetId = $role === 'vet' ? ($vet['id'] ?? 0) : null;
 
@@ -105,12 +93,8 @@ class ClinicalController extends Controller {
     }
 
     public function surgeryManager() {
-        if (!isset($_SESSION['user_id'])) {
-            header("Location: index.php?url=auth/login");
-            exit;
-        }
-
-        $role = $_SESSION['role'] ?? 'pet_owner';
+        $user = $this->requireAuth(['admin', 'vet']);
+        $role = $user['role'] ?? 'vet';
         if ($role !== 'vet') {
             if ($role === 'admin') {
                 header("Location: index.php?url=admin/surgery");
@@ -121,7 +105,7 @@ class ClinicalController extends Controller {
         }
 
         $db = Database::getInstance()->getConnection();
-        $userId = (int) $_SESSION['user_id'];
+        $userId = (int) $user['id'];
         $vet = $this->fetchOne($db, "SELECT id FROM veterinarians WHERE user_id = ?", [$userId]);
         $vetId = (int) ($vet['id'] ?? 0);
 
@@ -151,12 +135,8 @@ class ClinicalController extends Controller {
     }
 
     public function referralsWorkflow() {
-        if (!isset($_SESSION['user_id'])) {
-            header("Location: index.php?url=auth/login");
-            exit;
-        }
-
-        $role = $_SESSION['role'] ?? 'pet_owner';
+        $user = $this->requireAuth(['admin', 'vet']);
+        $role = $user['role'] ?? 'vet';
         if ($role !== 'vet') {
             if ($role === 'admin') {
                 header("Location: index.php?url=admin/referrals");
@@ -167,7 +147,7 @@ class ClinicalController extends Controller {
         }
 
         $db = Database::getInstance()->getConnection();
-        $userId = (int) $_SESSION['user_id'];
+        $userId = (int) $user['id'];
         $vet = $this->fetchOne($db, "SELECT id FROM veterinarians WHERE user_id = ?", [$userId]);
         $vetId = (int) ($vet['id'] ?? 0);
 
@@ -197,12 +177,8 @@ class ClinicalController extends Controller {
     }
 
     public function resourceManager() {
-        if (!isset($_SESSION['user_id'])) {
-            header("Location: index.php?url=auth/login");
-            exit;
-        }
-
-        $role = $_SESSION['role'] ?? 'pet_owner';
+        $user = $this->requireAuth('admin');
+        $role = $user['role'] ?? 'admin';
         if ($role !== 'admin') {
             http_response_code(403);
             die("Access denied. Surgery Resource Manager is available for admins only.");
@@ -692,13 +668,27 @@ class ClinicalController extends Controller {
             return [null, ['You can only transfer cases already linked to your procedures or referrals.']];
         }
 
+        $ownerUserId = $this->petOwnerUserId($db, $petId);
+        $toDoctor = $this->fetchOne($db, "SELECT u.username FROM veterinarians v LEFT JOIN users u ON u.id = v.user_id WHERE v.id = ?", [$toVetId]);
         $stmt = $db->prepare(
-            "INSERT INTO referrals (pet_id, from_vet_id, to_vet_id, specialty, reason, priority, status, notes)
-             VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)"
+            "INSERT INTO referrals (pet_id, owner_id, referred_by, referred_to, from_vet_id, to_vet_id, specialty, reason, priority, status, owner_response_status, notes)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'pending', ?)"
         );
-        $stmt->execute([$petId, $vetId, $toVetId, $specialty, $reason, $priority, 'Transferred from vet dashboard']);
-        $this->writeAudit($db, 'referral_created', 'referrals', (int) $db->lastInsertId(), "Transferred case to specialist.");
+        $stmt->execute([$petId, $ownerUserId, $_SESSION['user_id'] ?? null, $toDoctor['username'] ?? $specialty, $vetId, $toVetId, $specialty, $reason, $priority, 'Transferred from vet dashboard']);
+        $referralId = (int) $db->lastInsertId();
+        if ($ownerUserId) {
+            $this->notifyUser($db, $ownerUserId, 'Referral received', 'A vet sent a new referral request for your pet.', 'referral');
+        }
+        $this->writeAudit($db, 'referral_created', 'referrals', $referralId, "Transferred case to specialist.");
         return ['Referral case transferred successfully.', []];
+    }
+
+    private function notifyUser($db, $userId, $title, $message, $type) {
+        try {
+            $stmt = $db->prepare("INSERT INTO notifications (user_id, title, message, type, is_read) VALUES (?, ?, ?, ?, 0)");
+            $stmt->execute([$userId, $title, $message, $type]);
+        } catch (PDOException $e) {
+        }
     }
 
     private function createClinicalActionRequest($db, $actionKey, $title, $petId, $ownerUserId, $requesterUserId, $requesterRole, $targetVetId, $accessMode, $payload, $notes) {

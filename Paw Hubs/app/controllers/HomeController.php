@@ -2,17 +2,10 @@
 
 class HomeController extends Controller {
     public function index() {
-        if (!isset($_SESSION['user_id'])) {
-            header("Location: index.php?url=auth/login");
-            exit;
-        }
-
+        $user = $this->requireAuth(['pet_owner', 'service_provider', 'vet', 'admin']);
         $db = Database::getInstance()->getConnection();
-        $userId = $_SESSION['user_id'];
-
-        $user = $this->fetchOne($db, "SELECT * FROM users WHERE id = ?", [$userId]);
-        $role = $user['role'] ?? ($_SESSION['role'] ?? 'pet_owner');
-        $_SESSION['role'] = $role;
+        $userId = (int) $user['id'];
+        $role = $user['role'] ?? 'pet_owner';
 
         if ($role === 'admin') {
             header("Location: index.php?url=admin/index");
@@ -72,12 +65,13 @@ class HomeController extends Controller {
     }
 
     public function addPet() {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_SESSION['user_id'])) {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             http_response_code(403);
             header('Content-Type: application/json');
             echo json_encode(['success' => false, 'message' => 'Unauthorized request.']);
             exit;
         }
+        $this->requireAuth('pet_owner');
 
         $db = Database::getInstance()->getConnection();
         $userId = $_SESSION['user_id'];
@@ -211,12 +205,13 @@ class HomeController extends Controller {
     }
 
     public function editPet() {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_SESSION['user_id'])) {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             http_response_code(403);
             header('Content-Type: application/json');
             echo json_encode(['success' => false, 'message' => 'Unauthorized request.']);
             exit;
         }
+        $this->requireAuth('pet_owner');
 
         $db = Database::getInstance()->getConnection();
         $userId = $_SESSION['user_id'];
@@ -365,12 +360,13 @@ class HomeController extends Controller {
     }
 
     public function deletePet() {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_SESSION['user_id'])) {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             http_response_code(403);
             header('Content-Type: application/json');
             echo json_encode(['success' => false, 'message' => 'Unauthorized request.']);
             exit;
         }
+        $this->requireAuth('pet_owner');
 
         $db = Database::getInstance()->getConnection();
         $userId = $_SESSION['user_id'];

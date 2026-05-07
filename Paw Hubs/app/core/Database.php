@@ -293,10 +293,14 @@ class Database {
 
         CREATE TABLE IF NOT EXISTS `appointments` (
           `id` int(11) NOT NULL AUTO_INCREMENT,
+          `owner_id` int(11) DEFAULT NULL,
           `user_id` int(11) DEFAULT NULL,
           `pet_id` int(11) DEFAULT NULL,
+          `doctor_id` int(11) DEFAULT NULL,
           `appointment_date` date DEFAULT NULL,
+          `appointment_time` time DEFAULT NULL,
           `appointment_type` varchar(100) DEFAULT NULL,
+          `notes` text DEFAULT NULL,
           `status` varchar(50) DEFAULT 'upcoming',
           `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
           PRIMARY KEY (`id`)
@@ -445,6 +449,12 @@ class Database {
         $this->addColumnIfMissing('medical_procedures', 'created_at', "`created_at` timestamp NOT NULL DEFAULT current_timestamp() AFTER `notes`");
 
         $this->addColumnIfMissing('lab_reports', 'pet_id', "`pet_id` int(11) NOT NULL AFTER `id`");
+        $this->addColumnIfMissing('lab_reports', 'owner_id', "`owner_id` int(11) DEFAULT NULL AFTER `pet_id`");
+        $this->addColumnIfMissing('lab_reports', 'report_title', "`report_title` varchar(150) DEFAULT NULL AFTER `owner_id`");
+        $this->addColumnIfMissing('lab_reports', 'report_type', "`report_type` varchar(120) DEFAULT NULL AFTER `report_title`");
+        $this->addColumnIfMissing('lab_reports', 'doctor_name', "`doctor_name` varchar(150) DEFAULT NULL AFTER `report_type`");
+        $this->addColumnIfMissing('lab_reports', 'report_file', "`report_file` varchar(255) DEFAULT NULL AFTER `doctor_name`");
+        $this->addColumnIfMissing('lab_reports', 'notes', "`notes` text DEFAULT NULL AFTER `report_file`");
         $this->addColumnIfMissing('lab_reports', 'vet_id', "`vet_id` int(11) DEFAULT NULL AFTER `pet_id`");
         $this->addColumnIfMissing('lab_reports', 'test_name', "`test_name` varchar(120) NOT NULL AFTER `vet_id`");
         $this->addColumnIfMissing('lab_reports', 'result_summary', "`result_summary` varchar(255) DEFAULT NULL AFTER `test_name`");
@@ -453,16 +463,58 @@ class Database {
         $this->addColumnIfMissing('lab_reports', 'report_date', "`report_date` date DEFAULT NULL AFTER `status`");
         $this->addColumnIfMissing('lab_reports', 'file_path', "`file_path` varchar(255) DEFAULT NULL AFTER `report_date`");
         $this->addColumnIfMissing('lab_reports', 'created_at', "`created_at` timestamp NOT NULL DEFAULT current_timestamp() AFTER `file_path`");
+        $this->connection->exec("UPDATE `lab_reports` SET `owner_id` = COALESCE(`owner_id`, (SELECT po.user_id FROM pets p LEFT JOIN pet_owners po ON po.id = p.owner_id WHERE p.id = lab_reports.pet_id LIMIT 1))");
+        $this->connection->exec("UPDATE `lab_reports` SET `report_title` = COALESCE(NULLIF(`report_title`, ''), NULLIF(`test_name`, ''), 'Lab Report')");
+        $this->connection->exec("UPDATE `lab_reports` SET `report_type` = COALESCE(NULLIF(`report_type`, ''), NULLIF(`test_name`, ''), 'General')");
+        $this->connection->exec("UPDATE `lab_reports` SET `doctor_name` = COALESCE(NULLIF(`doctor_name`, ''), (SELECT u.username FROM veterinarians v LEFT JOIN users u ON u.id = v.user_id WHERE v.id = lab_reports.vet_id LIMIT 1), 'Care Team')");
+        $this->connection->exec("UPDATE `lab_reports` SET `report_file` = COALESCE(NULLIF(`report_file`, ''), NULLIF(SUBSTRING_INDEX(`file_path`, '/', -1), ''))");
+        $this->connection->exec("UPDATE `lab_reports` SET `notes` = COALESCE(`notes`, `interpretation`)");
 
         $this->addColumnIfMissing('referrals', 'pet_id', "`pet_id` int(11) NOT NULL AFTER `id`");
+        $this->addColumnIfMissing('referrals', 'owner_id', "`owner_id` int(11) DEFAULT NULL AFTER `pet_id`");
+        $this->addColumnIfMissing('referrals', 'referred_by', "`referred_by` int(11) DEFAULT NULL AFTER `owner_id`");
+        $this->addColumnIfMissing('referrals', 'referred_to', "`referred_to` varchar(150) DEFAULT NULL AFTER `owner_id`");
         $this->addColumnIfMissing('referrals', 'from_vet_id', "`from_vet_id` int(11) DEFAULT NULL AFTER `pet_id`");
         $this->addColumnIfMissing('referrals', 'to_vet_id', "`to_vet_id` int(11) DEFAULT NULL AFTER `from_vet_id`");
         $this->addColumnIfMissing('referrals', 'specialty', "`specialty` varchar(120) DEFAULT NULL AFTER `to_vet_id`");
         $this->addColumnIfMissing('referrals', 'reason', "`reason` text DEFAULT NULL AFTER `specialty`");
         $this->addColumnIfMissing('referrals', 'priority', "`priority` varchar(40) DEFAULT 'normal' AFTER `reason`");
         $this->addColumnIfMissing('referrals', 'status', "`status` varchar(40) DEFAULT 'pending' AFTER `priority`");
+        $this->addColumnIfMissing('referrals', 'owner_response_status', "`owner_response_status` varchar(40) NOT NULL DEFAULT 'pending' AFTER `status`");
+        $this->addColumnIfMissing('referrals', 'appointment_date', "`appointment_date` date DEFAULT NULL AFTER `status`");
         $this->addColumnIfMissing('referrals', 'requested_at', "`requested_at` timestamp NOT NULL DEFAULT current_timestamp() AFTER `status`");
         $this->addColumnIfMissing('referrals', 'notes', "`notes` text DEFAULT NULL AFTER `requested_at`");
+        $this->addColumnIfMissing('referrals', 'created_at', "`created_at` timestamp NOT NULL DEFAULT current_timestamp() AFTER `notes`");
+        $this->connection->exec("UPDATE `referrals` SET `owner_id` = COALESCE(`owner_id`, (SELECT po.user_id FROM pets p LEFT JOIN pet_owners po ON po.id = p.owner_id WHERE p.id = referrals.pet_id LIMIT 1))");
+        $this->connection->exec("UPDATE `referrals` SET `referred_by` = COALESCE(`referred_by`, (SELECT u.id FROM veterinarians v LEFT JOIN users u ON u.id = v.user_id WHERE v.id = referrals.from_vet_id LIMIT 1))");
+        $this->connection->exec("UPDATE `referrals` SET `referred_to` = COALESCE(NULLIF(`referred_to`, ''), (SELECT u.username FROM veterinarians v LEFT JOIN users u ON u.id = v.user_id WHERE v.id = referrals.to_vet_id LIMIT 1), NULLIF(`specialty`, ''))");
+        $this->connection->exec("UPDATE `referrals` SET `created_at` = COALESCE(`created_at`, `requested_at`)");
+
+        $this->addColumnIfMissing('appointments', 'owner_id', "`owner_id` int(11) DEFAULT NULL AFTER `id`");
+        $this->addColumnIfMissing('appointments', 'user_id', "`user_id` int(11) DEFAULT NULL AFTER `owner_id`");
+        $this->addColumnIfMissing('appointments', 'pet_id', "`pet_id` int(11) DEFAULT NULL AFTER `user_id`");
+        $this->addColumnIfMissing('appointments', 'doctor_id', "`doctor_id` int(11) DEFAULT NULL AFTER `pet_id`");
+        $this->addColumnIfMissing('appointments', 'appointment_date', "`appointment_date` date DEFAULT NULL AFTER `doctor_id`");
+        $this->addColumnIfMissing('appointments', 'appointment_time', "`appointment_time` time DEFAULT NULL AFTER `appointment_date`");
+        $this->addColumnIfMissing('appointments', 'appointment_type', "`appointment_type` varchar(100) DEFAULT NULL AFTER `appointment_time`");
+        $this->addColumnIfMissing('appointments', 'notes', "`notes` text DEFAULT NULL AFTER `appointment_type`");
+        $this->addColumnIfMissing('appointments', 'status', "`status` varchar(50) DEFAULT 'upcoming' AFTER `notes`");
+        $this->addColumnIfMissing('appointments', 'created_at', "`created_at` timestamp NOT NULL DEFAULT current_timestamp() AFTER `status`");
+        $this->connection->exec("UPDATE `appointments` SET `owner_id` = COALESCE(`owner_id`, `user_id`)");
+        $this->createIndexIfMissing('lab_reports', 'idx_lab_reports_pet', '(`pet_id`)');
+        $this->createIndexIfMissing('lab_reports', 'idx_lab_reports_owner', '(`owner_id`)');
+        $this->createIndexIfMissing('referrals', 'idx_referrals_pet', '(`pet_id`)');
+        $this->createIndexIfMissing('referrals', 'idx_referrals_owner', '(`owner_id`)');
+        $this->createIndexIfMissing('appointments', 'idx_appointments_pet', '(`pet_id`)');
+        $this->createIndexIfMissing('appointments', 'idx_appointments_owner', '(`owner_id`)');
+        $this->createIndexIfMissing('appointments', 'idx_appointments_doctor', '(`doctor_id`)');
+        $this->addForeignKeyIfMissing('lab_reports', 'fk_lab_reports_pet', 'FOREIGN KEY (`pet_id`) REFERENCES `pets`(`id`) ON DELETE CASCADE');
+        $this->addForeignKeyIfMissing('lab_reports', 'fk_lab_reports_owner', 'FOREIGN KEY (`owner_id`) REFERENCES `users`(`id`) ON DELETE CASCADE');
+        $this->addForeignKeyIfMissing('referrals', 'fk_referrals_pet', 'FOREIGN KEY (`pet_id`) REFERENCES `pets`(`id`) ON DELETE CASCADE');
+        $this->addForeignKeyIfMissing('referrals', 'fk_referrals_owner', 'FOREIGN KEY (`owner_id`) REFERENCES `users`(`id`) ON DELETE CASCADE');
+        $this->addForeignKeyIfMissing('appointments', 'fk_appointments_pet', 'FOREIGN KEY (`pet_id`) REFERENCES `pets`(`id`) ON DELETE CASCADE');
+        $this->addForeignKeyIfMissing('appointments', 'fk_appointments_owner', 'FOREIGN KEY (`owner_id`) REFERENCES `users`(`id`) ON DELETE CASCADE');
+        $this->addForeignKeyIfMissing('appointments', 'fk_appointments_doctor', 'FOREIGN KEY (`doctor_id`) REFERENCES `users`(`id`) ON DELETE SET NULL');
 
         $this->addColumnIfMissing('audit_logs', 'user_id', "`user_id` int(11) DEFAULT NULL AFTER `id`");
         $this->addColumnIfMissing('audit_logs', 'admin_id', "`admin_id` int(11) DEFAULT NULL AFTER `user_id`");
@@ -581,6 +633,41 @@ class Database {
         ");
         $stmt->execute([$table]);
         return (int) $stmt->fetchColumn() > 0;
+    }
+
+    private function createIndexIfMissing($table, $indexName, $definition) {
+        $stmt = $this->connection->prepare("
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.STATISTICS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = ?
+              AND INDEX_NAME = ?
+        ");
+        $stmt->execute([$table, $indexName]);
+
+        if ((int) $stmt->fetchColumn() === 0) {
+            $this->connection->exec("ALTER TABLE `$table` ADD INDEX `$indexName` $definition");
+        }
+    }
+
+    private function addForeignKeyIfMissing($table, $constraintName, $definition) {
+        $stmt = $this->connection->prepare("
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = ?
+              AND CONSTRAINT_NAME = ?
+              AND CONSTRAINT_TYPE = 'FOREIGN KEY'
+        ");
+        $stmt->execute([$table, $constraintName]);
+
+        if ((int) $stmt->fetchColumn() === 0) {
+            try {
+                $this->connection->exec("ALTER TABLE `$table` ADD CONSTRAINT `$constraintName` $definition");
+            } catch (PDOException $e) {
+                // Preserve local compatibility if historical data prevents adding the FK.
+            }
+        }
     }
 
     private function backfillUsernames() {

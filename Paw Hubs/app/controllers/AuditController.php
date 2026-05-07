@@ -2,6 +2,7 @@
 
 class AuditController extends Controller {
     public function index() {
+        $this->requireAuth('admin');
         header("Location: index.php?url=admin/privacyAudit");
         exit;
     }

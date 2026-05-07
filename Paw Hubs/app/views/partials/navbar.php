@@ -65,20 +65,22 @@ if (isset($_SESSION['user_id'])) {
     <ul class="nav-links">
       <li><a href="index.php?url=home/index" class="active">Home</a></li>
       <?php if ($role == 'pet_owner'): ?>
-          <li><a href="#">My Pets</a></li>
-          <li><a href="index.php?url=clinical/labHub">Lab Hub</a></li>
+          <li><a href="index.php?url=home/index">My Pets</a></li>
       <?php endif; ?>
-      <li><a href="#">Appointments</a></li>
-      <li><a href="#">Marketplace</a></li>
-      <li><a href="#">Services</a></li>
+      <?php if ($role === 'pet_owner'): ?>
+          <li><a href="index.php?url=appointments/index">Appointments</a></li>
+          <li><a href="#">Marketplace</a></li>
+          <li><a href="#">Services</a></li>
+      <?php endif; ?>
       <?php if (in_array($role, ['admin', 'vet'], true)): ?>
           <li><a href="index.php?url=clinical/index">Clinical</a></li>
-          <li><a href="index.php?url=clinical/labHub">Lab Hub</a></li>
+          <li><a href="index.php?url=appointments/index">Appointments</a></li>
+          <li><a href="index.php?url=clinical/labHub">Lab Reports</a></li>
       <?php endif; ?>
       <?php if ($role === 'admin'): ?>
           <li><a href="index.php?url=admin/index">Admin</a></li>
-          <li><a href="index.php?url=clinical/resourceManager">Surgery Manager</a></li>
-          <li><a href="index.php?url=audit/index">Audit Log</a></li>
+          <li><a href="index.php?url=admin/reports">Reports</a></li>
+          <li><a href="index.php?url=admin/clinical">System Controls</a></li>
       <?php endif; ?>
       <li><a href="index.php?url=about/index">About</a></li>
     </ul>

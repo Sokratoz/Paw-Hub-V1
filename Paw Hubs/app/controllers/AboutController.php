@@ -5,11 +5,11 @@ class AboutController extends Controller {
         $db = Database::getInstance()->getConnection();
 
         $stats = [
-            'orders_total' => 150000,
-            'orders_success' => 95000,
-            'doctor_rating' => 4.8,
-            'service_rating' => 4.7,
-            'active_users' => 100000,
+            'orders_total' => $this->countRows($db, 'orders'),
+            'orders_success' => $this->countOrdersSuccess($db),
+            'doctor_rating' => $this->averageDoctorRating($db) ?? 0,
+            'service_rating' => $this->averageServiceRating($db) ?? 0,
+            'active_users' => $this->countRows($db, 'users'),
             'reviews' => $this->getTopReviews($db, 6)
         ];
 

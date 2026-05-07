@@ -6,10 +6,7 @@ class UserController extends Controller {
     }
 
     public function profile() {
-        if (!isset($_SESSION['user_id'])) {
-            header("Location: index.php?url=auth/login");
-            exit;
-        }
+        $this->requireAuth(['pet_owner', 'vet', 'admin', 'service_provider']);
 
         $userModel = $this->model('User');
         $db = Database::getInstance()->getConnection();
@@ -66,6 +63,7 @@ class UserController extends Controller {
                 $_SESSION['username'] = $userData['username'];
                 $_SESSION['profile_pic'] = $userData['image'] ?? 'default.png';
                 $success = 'Profile updated successfully.';
+                $this->notify($userId, 'Profile updated', 'Your account profile was updated successfully.', 'profile');
             } elseif ($uploadedImage && file_exists($uploadedImage)) {
                 unlink($uploadedImage);
             }

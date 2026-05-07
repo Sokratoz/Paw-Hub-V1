@@ -18,20 +18,8 @@ class AdminController extends Controller {
     }
 
     public function approvals() {
-        if (!isset($_SESSION['user_id'])) {
-            header("Location: index.php?url=auth/login");
-            exit;
-        }
-
+        $user = $this->requireAuth('admin');
         $db = Database::getInstance()->getConnection();
-        $user = $this->fetchOne($db, "SELECT * FROM users WHERE id = ?", [$_SESSION['user_id']]);
-        $role = $user['role'] ?? ($_SESSION['role'] ?? 'pet_owner');
-        $_SESSION['role'] = $role;
-
-        if ($role !== 'admin') {
-            http_response_code(403);
-            die("Access denied. Admin Dashboard is available for admins only.");
-        }
 
         $message = null;
         $errors = [];
@@ -58,20 +46,8 @@ class AdminController extends Controller {
     }
 
     public function referrals() {
-        if (!isset($_SESSION['user_id'])) {
-            header("Location: index.php?url=auth/login");
-            exit;
-        }
-
+        $user = $this->requireAuth('admin');
         $db = Database::getInstance()->getConnection();
-        $user = $this->fetchOne($db, "SELECT * FROM users WHERE id = ?", [$_SESSION['user_id']]);
-        $role = $user['role'] ?? ($_SESSION['role'] ?? 'pet_owner');
-        $_SESSION['role'] = $role;
-
-        if ($role !== 'admin') {
-            http_response_code(403);
-            die("Access denied. Admin Dashboard is available for admins only.");
-        }
 
         $message = null;
         $errors = [];
@@ -105,20 +81,8 @@ class AdminController extends Controller {
     }
 
     private function render($page) {
-        if (!isset($_SESSION['user_id'])) {
-            header("Location: index.php?url=auth/login");
-            exit;
-        }
-
+        $user = $this->requireAuth('admin');
         $db = Database::getInstance()->getConnection();
-        $user = $this->fetchOne($db, "SELECT * FROM users WHERE id = ?", [$_SESSION['user_id']]);
-        $role = $user['role'] ?? ($_SESSION['role'] ?? 'pet_owner');
-        $_SESSION['role'] = $role;
-
-        if ($role !== 'admin') {
-            http_response_code(403);
-            die("Access denied. Admin Dashboard is available for admins only.");
-        }
 
         $message = null;
         $errors = [];
