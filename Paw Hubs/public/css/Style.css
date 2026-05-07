@@ -486,7 +486,62 @@
   background: #f3c8c8;
 }
 
+/* ---- Pet Delete Confirmation (confirm-overlay) ---- */
+.confirm-overlay .confirm-modal {
+  width: min(500px, 92%);
+  border-radius: 24px;
+  padding: 26px 24px;
+  background: #ffffff;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.18);
+  position: relative;
+  overflow: hidden;
+}
+
+.confirm-overlay .confirm-modal::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  background: radial-gradient(circle at 20% 0%, rgba(255, 99, 99, 0.22), transparent 46%),
+    radial-gradient(circle at 90% 10%, rgba(255, 193, 7, 0.14), transparent 52%);
+  pointer-events: none;
+}
+
+.confirm-overlay .confirm-title {
+  position: relative;
+  z-index: 1;
+  font-size: 1.45rem;
+  margin: 0 0 10px;
+  color: #21332f;
+  font-weight: 900;
+}
+
+.confirm-overlay .confirm-text {
+  position: relative;
+  z-index: 1;
+  margin: 0 0 18px;
+  color: #4f625d;
+  line-height: 1.8;
+}
+
+.confirm-overlay .confirm-actions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.confirm-overlay .confirm-actions .btn.secondary {
+  min-width: 140px;
+}
+
+.confirm-overlay .confirm-actions .btn.danger {
+  min-width: 140px;
+}
+
 .pet-detail-grid {
+
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px;
@@ -770,16 +825,17 @@
 }
 
 .pet-preview {
-  width: 160px;
-  height: 160px;
-  border-radius: 50%;
+  width: 220px;
+  height: 220px;
+  border-radius: 36px;
   background: #eef7f4;
-  border: 4px solid #dff3ec;
+  border: 5px solid #dff3ec;
   overflow: hidden;
-  display: grid;
-  place-items: center;
+  display: block;
   margin: 0 auto;
+  object-fit: cover;
 }
+
 
 .pet-preview img {
   width: 100%;

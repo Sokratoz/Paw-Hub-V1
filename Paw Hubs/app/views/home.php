@@ -1597,7 +1597,7 @@ $displayPets = $pets;
                         <h2 id="editPetTitle">Update pet details</h2>
                         <p>Keep your pet's profile up to date with the latest information.</p>
                     </div>
-                    <form id="editPetForm" class="pet-form" enctype="multipart/form-data">
+                    <form id="editPetForm" class="pet-form" method="POST" enctype="multipart/form-data">
                         <input type="hidden" name="id" id="editPetId">
                         <div class="form-grid">
                             <div class="pet-form-field">
