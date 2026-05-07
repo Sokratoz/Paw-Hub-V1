@@ -6,6 +6,7 @@
     <title>Home | Paw Hubs</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="css/Style.css">
     <style>
         :root {
             --teal: #6BB5A8;
@@ -81,20 +82,7 @@
             flex-wrap: wrap;
         }
 
-        .notification-banner {
-            max-width: 1120px;
-            margin: 0 auto 24px;
-            padding: 18px 22px;
-            border-radius: 18px;
-            background: linear-gradient(135deg, #daf7ed, #eafbf2);
-            border: 1px solid #c8e9d9;
-            color: #1f4e3b;
-            font-weight: 700;
-            box-shadow: 0 14px 30px rgba(45, 123, 98, 0.08);
-            text-align: center;
-        }
-
-        .btn {
+.btn {
             min-height: 54px;
             padding: 0 26px;
             border: 1px solid transparent;
@@ -1334,20 +1322,6 @@
 <?php require_once '../app/views/partials/navbar.php'; ?>
 
 <?php
-$homeNotification = '';
-if (!empty($_SESSION['flash_success'])) {
-    $homeNotification = trim($_SESSION['flash_success']);
-    unset($_SESSION['flash_success']);
-} elseif (isset($_SESSION['user_id'])) {
-    $firstName = explode(' ', trim($_SESSION['username'] ?? ''))[0] ?: 'there';
-    $homeNotification = "Welcome back, " . htmlspecialchars($firstName) . "!";
-}
-?>
-<?php if ($homeNotification): ?>
-    <div class="notification-banner"><?= htmlspecialchars($homeNotification) ?></div>
-<?php endif; ?>
-
-<?php
 $username = isset($username) ? $username : ($_SESSION['username'] ?? 'Guest');
 $pets = isset($pets) && is_array($pets) ? $pets : [];
 $stats = isset($stats) && is_array($stats) ? $stats : [
@@ -1361,14 +1335,14 @@ $stats = isset($stats) && is_array($stats) ? $stats : [
 $recommendedProducts = isset($recommendedProducts) && is_array($recommendedProducts) ? $recommendedProducts : [];
 
 $firstName = explode(' ', trim($username))[0] ?: 'Guest';
-$displayPets = array_slice($pets, 0, 2);
+$displayPets = $pets;
 ?>
 
 <main class="page-shell">
     <section class="hero">
         <div class="hero-copy">
-            <h1>Welcome back, <?= htmlspecialchars($firstName) ?>! 👋</h1>
-            <p>Track your pet's health, book appointments, and find the best products for them.</p>
+            <h1>Your pet's health, care, and community—together.</h1>
+            <p>Track appointments, manage wellness, and discover the best pet products in one premium hub.</p>
             <div class="hero-actions">
                 <a href="index.php?url=appointments/index" class="btn primary"><i class="far fa-calendar-plus"></i> Book Appointment</a>
                 <a href="#my-pets" class="btn"><i class="fas fa-paw"></i> View My Pets</a>
@@ -1428,24 +1402,36 @@ $displayPets = array_slice($pets, 0, 2);
                 <h2>My Pets</h2>
             </div>
             <div class="pets-grid">
+                <?php if (empty($displayPets)): ?>
+                    <div class="empty-pets-state">No pets added yet. Add your first companion to begin tracking.</div>
+                <?php endif; ?>
+
                 <?php foreach ($displayPets as $index => $pet): ?>
                     <?php
-                    $isCat = stripos($pet['species'], 'cat') !== false;
-                    $avatar = $isCat ? 'guest.png' : 'Welcome.png';
+                    $petImage = trim((string) ($pet['image'] ?? ''));
+                    $petImage = pathinfo($petImage, PATHINFO_BASENAME);
+                    $petImage = $petImage !== '' ? 'uploads/pets/' . htmlspecialchars($petImage) : 'uploads/pets/default-pet.png';
+                    $petData = htmlspecialchars(json_encode($pet), ENT_QUOTES, 'UTF-8');
+                    $badgeText = !empty($pet['vaccination_status']) && strtolower($pet['vaccination_status']) !== 'unknown'
+                        ? htmlspecialchars($pet['vaccination_status'])
+                        : 'Vaccine status pending';
                     ?>
-                    <article class="pet-card">
-                        <div class="pet-badge <?= $index % 2 ? 'tone-green' : '' ?>"><i class="fas fa-paw"></i></div>
-                        <div class="pet-avatar">
-                            <img src="images/<?= htmlspecialchars($avatar) ?>" alt="<?= htmlspecialchars($pet['name']) ?>">
+                    <article class="pet-card" data-pet-id="<?= (int) $pet['id'] ?>" data-pet='<?= $petData ?>'>
+                        <div class="pet-card-ribbon"><span><?= $badgeText ?></span></div>
+                        <div class="pet-image">
+                            <img src="<?= $petImage ?>" alt="<?= htmlspecialchars($pet['name']) ?>" class="pet-image-thumb" onerror="this.onerror=null;this.src='uploads/pets/default-pet.png'">
                         </div>
                         <h3><?= htmlspecialchars($pet['name']) ?></h3>
-                        <p class="pet-meta"><?= htmlspecialchars($pet['species']) ?></p>
-                        <p class="pet-meta"><?= (int) $pet['age'] ?> Years</p>
-                        <a href="#" class="pet-action">View Profile</a>
+                        <p class="pet-meta"><?= htmlspecialchars($pet['species']) ?> · <?= htmlspecialchars($pet['breed'] ?: 'Unknown breed') ?></p>
+                        <div class="pet-stats-row">
+                            <span><?= (int) $pet['age'] ?> yrs</span>
+                            <span><?= htmlspecialchars($pet['color'] ?: 'No color') ?></span>
+                        </div>
+                        <button type="button" class="view-details-btn">View Details <i class="fas fa-arrow-right"></i></button>
                     </article>
                 <?php endforeach; ?>
 
-                <article class="pet-card add-card">
+                <article class="pet-card add-card" id="openPetModalButton">
                     <div class="add-avatar"><i class="fas fa-plus"></i></div>
                     <h3>Add New Pet</h3>
                     <p class="pet-meta">Add your pet to get started</p>
@@ -1453,6 +1439,237 @@ $displayPets = array_slice($pets, 0, 2);
             </div>
         </div>
     </section>
+
+    <div class="pet-modal-overlay" id="petModalBackdrop" aria-hidden="true">
+        <div class="pet-modal" role="dialog" aria-modal="true" aria-labelledby="petModalTitle">
+            <button type="button" class="close-modal" id="closePetModal"><i class="fas fa-times"></i></button>
+            <div class="pet-modal-left">
+                <div class="pet-image-panel">
+                    <div class="pet-image-header">
+                        <h3>Upload pet photo</h3>
+                        <p>Choose a clear image so your pet profile looks premium.</p>
+                    </div>
+                    <div class="pet-preview">
+                        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%23eef7f4'/%3E%3Ccircle cx='90' cy='94' r='60' fill='%23dff3ec'/%3E%3Ccircle cx='90' cy='64' r='30' fill='%239ad1b8'/%3E%3Ccircle cx='70' cy='56' r='7' fill='%237fae99'/%3E%3Ccircle cx='110' cy='56' r='7' fill='%237fae99'/%3E%3C/svg%3E" alt="Pet preview" id="petPreviewImg">
+                    </div>
+                    <label for="petImageInput" class="upload-dropzone">
+                        <div class="upload-dropzone-inner">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <strong>Upload photo</strong>
+                            <span>PNG, JPG or WEBP</span>
+                        </div>
+                        <input id="petImageInput" name="pet_image" type="file" accept="image/jpeg,image/png,image/webp">
+                    </label>
+                    <p class="upload-note">Use a square or portrait image for the best result.</p>
+                </div>
+            </div>
+            <div class="pet-modal-right">
+                <div class="modal-header">
+                    <span class="modal-tag">New Pet</span>
+                    <h2 id="petModalTitle">Add a pet to your care circle</h2>
+                    <p>Capture pet details and medical notes so everything stays ready for visits and wellness checks.</p>
+                </div>
+                <form id="addPetForm" class="pet-form" enctype="multipart/form-data">
+                    <div class="form-grid">
+                        <div class="pet-form-field">
+                            <label for="petName">Pet Name</label>
+                            <input id="petName" name="name" type="text" placeholder="e.g. Luna" required>
+                        </div>
+                        <div class="pet-form-field">
+                            <label for="petSpecies">Species</label>
+                            <select id="petSpecies" name="species" required>
+                                <option value="">Select species</option>
+                                <option value="Dog">Dog</option>
+                                <option value="Cat">Cat</option>
+                                <option value="Bird">Bird</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="pet-form-field">
+                            <label for="petBreed">Breed</label>
+                            <input id="petBreed" name="breed" type="text" placeholder="e.g. Labrador">
+                        </div>
+                        <div class="pet-form-field">
+                            <label for="petAge">Age</label>
+                            <input id="petAge" name="age" type="number" min="0" step="1" placeholder="Years" required>
+                        </div>
+                        <div class="pet-form-field">
+                            <label for="petGender">Gender</label>
+                            <select id="petGender" name="gender">
+                                <option value="Unknown">Unknown</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="pet-form-field">
+                            <label for="petWeight">Weight</label>
+                            <input id="petWeight" name="weight" type="number" min="0" step="0.1" placeholder="kg">
+                        </div>
+                        <div class="pet-form-field">
+                            <label for="petColor">Color</label>
+                            <input id="petColor" name="color" type="text" placeholder="e.g. Golden">
+                        </div>
+                        <div class="pet-form-field">
+                            <label for="petVaccinationStatus">Vaccination Status</label>
+                            <input id="petVaccinationStatus" name="vaccination_status" type="text" placeholder="e.g. Up to date">
+                        </div>
+                        <div class="pet-form-field form-full">
+                            <label for="petMedicalNotes">Medical Notes</label>
+                            <textarea id="petMedicalNotes" name="medical_notes" placeholder="Allergies, medications, behavior notes" rows="4"></textarea>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn secondary" id="cancelPetModal">Cancel</button>
+                        <button type="submit" class="btn primary add-pet-btn">Add Pet</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="pet-detail-overlay" id="petDetailOverlay" aria-hidden="true">
+        <div class="pet-detail-modal" role="dialog" aria-modal="true" aria-labelledby="petDetailTitle">
+            <button type="button" class="close-modal" id="closeDetailModal"><i class="fas fa-times"></i></button>
+            <div class="pet-detail-content">
+                <div class="pet-detail-left">
+                    <div class="pet-detail-image">
+                        <img id="detailPetImage" src="uploads/pets/default-pet.png" alt="Pet image">
+                    </div>
+                    <div class="pet-detail-badge" id="detailPetStatus"></div>
+                </div>
+                <div class="pet-detail-right">
+                    <div class="pet-detail-header">
+                        <span class="modal-tag">Pet Profile</span>
+                        <h2 id="petDetailTitle"></h2>
+                        <p id="petDetailSubtitle"></p>
+                    </div>
+                    <div class="detail-actions">
+                        <button type="button" class="btn secondary edit-pet-btn" id="detailEditButton">Edit</button>
+                        <button type="button" class="btn danger delete-pet-btn" id="detailDeleteButton">Delete</button>
+                    </div>
+                    <div class="pet-detail-grid">
+                        <div><strong>Species</strong><span id="detailSpecies"></span></div>
+                        <div><strong>Breed</strong><span id="detailBreed"></span></div>
+                        <div><strong>Age</strong><span id="detailAge"></span></div>
+                        <div><strong>Gender</strong><span id="detailGender"></span></div>
+                        <div><strong>Weight</strong><span id="detailWeight"></span></div>
+                        <div><strong>Color</strong><span id="detailColor"></span></div>
+                        <div><strong>Vaccination</strong><span id="detailVaccination"></span></div>
+                        <div><strong>Created</strong><span id="detailCreated"></span></div>
+                    </div>
+                    <div class="pet-detail-notes">
+                        <strong>Medical notes</strong>
+                        <p id="detailNotes"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="pet-detail-overlay" id="petEditOverlay" aria-hidden="true">
+        <div class="pet-detail-modal" role="dialog" aria-modal="true" aria-labelledby="editPetTitle">
+            <button type="button" class="close-modal" id="closeEditModal"><i class="fas fa-times"></i></button>
+            <div class="pet-detail-content">
+                <div class="pet-modal-left">
+                    <div class="pet-image-panel">
+                        <div class="pet-image-header">
+                            <h3>Change Pet Photo</h3>
+                            <p>Upload a new image to update your pet's profile picture.</p>
+                        </div>
+                        <div class="pet-preview">
+                            <img id="editPetImagePreview" src="uploads/pets/default-pet.png" alt="Edit pet image">
+                        </div>
+                        <div class="upload-dropzone" id="editUploadDropzone">
+                            <div class="upload-dropzone-inner">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <strong>Upload New Image</strong>
+                                <span>Drag & drop or click to select</span>
+                            </div>
+                            <input type="file" name="pet_image" id="editPetImage" accept="image/*">
+                        </div>
+                        <p class="upload-note">Supported formats: JPG, PNG, WebP. Max size: 5MB.</p>
+                    </div>
+                </div>
+                <div class="pet-modal-right">
+                    <div class="modal-header">
+                        <span class="modal-tag">Edit Pet</span>
+                        <h2 id="editPetTitle">Update pet details</h2>
+                        <p>Keep your pet's profile up to date with the latest information.</p>
+                    </div>
+                    <form id="editPetForm" class="pet-form" enctype="multipart/form-data">
+                        <input type="hidden" name="id" id="editPetId">
+                        <div class="form-grid">
+                            <div class="pet-form-field">
+                                <label for="editPetName">Pet Name</label>
+                                <input id="editPetName" name="name" type="text" placeholder="e.g. Luna" required>
+                            </div>
+                            <div class="pet-form-field">
+                                <label for="editSpecies">Species</label>
+                                <select id="editSpecies" name="species" required>
+                                    <option value="">Select species</option>
+                                    <option value="Dog">Dog</option>
+                                    <option value="Cat">Cat</option>
+                                    <option value="Bird">Bird</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            <div class="pet-form-field">
+                                <label for="editBreed">Breed</label>
+                                <input id="editBreed" name="breed" type="text" placeholder="e.g. Labrador">
+                            </div>
+                            <div class="pet-form-field">
+                                <label for="editAge">Age</label>
+                                <input id="editAge" name="age" type="number" placeholder="Age in years" min="0" required>
+                            </div>
+                            <div class="pet-form-field">
+                                <label for="editGender">Gender</label>
+                                <select id="editGender" name="gender">
+                                    <option value="Male">Male</option>
+                                    <option value="Female">Female</option>
+                                    <option value="Unknown">Unknown</option>
+                                </select>
+                            </div>
+                            <div class="pet-form-field">
+                                <label for="editWeight">Weight</label>
+                                <input id="editWeight" name="weight" type="text" placeholder="e.g. 5.5 kg">
+                            </div>
+                            <div class="pet-form-field">
+                                <label for="editColor">Color</label>
+                                <input id="editColor" name="color" type="text" placeholder="e.g. Brown, White">
+                            </div>
+                            <div class="pet-form-field">
+                                <label for="editVaccination">Vaccination Status</label>
+                                <input id="editVaccination" name="vaccination_status" type="text" placeholder="e.g. Up to date">
+                            </div>
+                        </div>
+                        <div class="pet-form-field wide-field">
+                            <label for="editMedicalNotes">Medical Notes</label>
+                            <textarea id="editMedicalNotes" name="medical_notes" placeholder="Allergies, medications, behavior notes" rows="4"></textarea>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn secondary" id="cancelEditButton">Cancel</button>
+                            <button type="submit" class="btn">Save Changes</button>
+                            <button type="button" class="btn danger" id="deleteFromEditButton">Delete Pet</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="confirm-overlay" id="confirmDeleteOverlay" aria-hidden="true">
+        <div class="confirm-modal">
+            <p class="confirm-title">Delete pet profile?</p>
+            <p class="confirm-text">This action cannot be undone. The pet profile will be permanently removed.</p>
+            <div class="confirm-actions">
+                <button type="button" class="btn secondary" id="cancelDeleteButton">Cancel</button>
+                <button type="button" class="btn danger" id="confirmDeleteButton">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-message" id="petToast"></div>
 
     <!-- Marketplace section -->
     <section class="panel marketplace-section" aria-labelledby="marketplace-title">
@@ -1676,6 +1893,458 @@ $displayPets = array_slice($pets, 0, 2);
 
 <?php require_once '../app/views/partials/footer.php'; ?>
 <?php require_once '../app/views/partials/theme_toggle.php'; ?>
+
+<script>
+const openPetModalButton = document.getElementById('openPetModalButton');
+const petModalBackdrop = document.getElementById('petModalBackdrop');
+const closePetModal = document.getElementById('closePetModal');
+const cancelPetModal = document.getElementById('cancelPetModal');
+const addPetForm = document.getElementById('addPetForm');
+const petPreviewImg = document.getElementById('petPreviewImg');
+const petImageInput = document.getElementById('petImageInput');
+const uploadDropzone = document.querySelector('.upload-dropzone');
+const petToast = document.getElementById('petToast');
+const petsGrid = document.querySelector('.pets-grid');
+const detailOverlay = document.getElementById('petDetailOverlay');
+const closeDetailModal = document.getElementById('closeDetailModal');
+const editOverlay = document.getElementById('petEditOverlay');
+const closeEditModal = document.getElementById('closeEditModal');
+const cancelEditButton = document.getElementById('cancelEditButton');
+const confirmDeleteOverlay = document.getElementById('confirmDeleteOverlay');
+const cancelDeleteButton = document.getElementById('cancelDeleteButton');
+const confirmDeleteButton = document.getElementById('confirmDeleteButton');
+const detailPetImage = document.getElementById('detailPetImage');
+const detailPetStatus = document.getElementById('detailPetStatus');
+const detailPetTitle = document.getElementById('petDetailTitle');
+const detailSubtitle = document.getElementById('petDetailSubtitle');
+const detailSpecies = document.getElementById('detailSpecies');
+const detailBreed = document.getElementById('detailBreed');
+const detailAge = document.getElementById('detailAge');
+const detailGender = document.getElementById('detailGender');
+const detailWeight = document.getElementById('detailWeight');
+const detailColor = document.getElementById('detailColor');
+const detailVaccination = document.getElementById('detailVaccination');
+const detailNotes = document.getElementById('detailNotes');
+const detailCreated = document.getElementById('detailCreated');
+const detailEditButton = document.getElementById('detailEditButton');
+const detailDeleteButton = document.getElementById('detailDeleteButton');
+const editPetForm = document.getElementById('editPetForm');
+const editPetId = document.getElementById('editPetId');
+const editPetName = document.getElementById('editPetName');
+const editSpecies = document.getElementById('editSpecies');
+const editBreed = document.getElementById('editBreed');
+const editAge = document.getElementById('editAge');
+const editGender = document.getElementById('editGender');
+const editWeight = document.getElementById('editWeight');
+const editColor = document.getElementById('editColor');
+const editVaccination = document.getElementById('editVaccination');
+const editMedicalNotes = document.getElementById('editMedicalNotes');
+const editPetImage = document.getElementById('editPetImage');
+const editUploadDropzone = document.getElementById('editUploadDropzone');
+const deleteFromEditButton = document.getElementById('deleteFromEditButton');
+const defaultPetPlaceholder = 'data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 400 400%27%3E%3Crect width=%27400%27 height=%27400%27 fill=%27%23f5f7f6%27/%3E%3Ccircle cx=%27200%27 cy=%27208%27 r=%27130%27 fill=%27%23def4ea%27/%3E%3Ccircle cx=%27200%27 cy=%27140%27 r=%2772%27 fill=%27%239ad1b8%27/%3E%3Ccircle cx=%27150%27 cy=%27120%27 r=%2716%27 fill=%27%237fae99%27/%3E%3Ccircle cx=%27250%27 cy=%27120%27 r=%2716%27 fill=%27%237fae99%27/%3E%3C/svg%3E';
+
+const showPetModal = () => {
+    petModalBackdrop.classList.add('show');
+    petModalBackdrop.setAttribute('aria-hidden', 'false');
+};
+
+const hidePetModal = () => {
+    petModalBackdrop.classList.remove('show');
+    petModalBackdrop.setAttribute('aria-hidden', 'true');
+    addPetForm.reset();
+    petPreviewImg.src = defaultPetPlaceholder;
+};
+
+const showToast = (message) => {
+    if (!petToast) return;
+    petToast.textContent = message;
+    petToast.classList.add('show');
+    window.setTimeout(() => petToast.classList.remove('show'), 3200);
+};
+
+const showPetDetails = (pet) => {
+    const imageName = pet.image ? pet.image.split('/').pop() : '';
+    const imageUrl = imageName ? `uploads/pets/${imageName}` : 'uploads/pets/default-pet.png';
+    detailPetImage.src = imageUrl;
+    detailPetImage.alt = pet.name ? `${pet.name} profile` : 'Pet image';
+    detailPetStatus.textContent = pet.vaccination_status && pet.vaccination_status !== 'Unknown' ? pet.vaccination_status : 'Vaccine status pending';
+    detailPetTitle.textContent = pet.name || 'Unnamed pet';
+    detailSubtitle.textContent = `${pet.species || 'Species unknown'} · ${pet.breed || 'Unknown breed'}`;
+    detailSpecies.textContent = pet.species || 'Unknown';
+    detailBreed.textContent = pet.breed || 'Unknown';
+    detailAge.textContent = pet.age ? `${pet.age} years` : 'Unknown';
+    detailGender.textContent = pet.gender || 'Unknown';
+    detailWeight.textContent = pet.weight ? `${pet.weight} kg` : 'Unknown';
+    detailColor.textContent = pet.color || 'Unknown';
+    detailVaccination.textContent = pet.vaccination_status || 'Unknown';
+    detailNotes.textContent = pet.medical_notes || 'No medical notes available.';
+    detailCreated.textContent = pet.created_at ? new Date(pet.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Unknown';
+    detailOverlay.classList.add('show');
+    detailOverlay.dataset.currentPet = pet.id || '';
+};
+
+const openEditModal = (pet) => {
+    detailOverlay.classList.remove('show');
+    const imageName = pet.image ? pet.image.split('/').pop() : '';
+    const imageUrl = imageName ? `uploads/pets/${imageName}` : 'uploads/pets/default-pet.png';
+    editPetImagePreview.src = imageUrl;
+    editPetImagePreview.alt = pet.name ? `${pet.name} profile` : 'Pet image';
+    editPetId.value = pet.id || '';
+    editPetName.value = pet.name || '';
+    editSpecies.value = pet.species || '';
+    editBreed.value = pet.breed || '';
+    editAge.value = pet.age || '';
+    editGender.value = pet.gender || 'Unknown';
+    editWeight.value = pet.weight || '';
+    editColor.value = pet.color || '';
+    editVaccination.value = pet.vaccination_status || '';
+    editMedicalNotes.value = pet.medical_notes || '';
+    editPetImage.value = '';
+    editOverlay.classList.add('show');
+};
+
+const closeEditOverlay = () => {
+    editOverlay.classList.remove('show');
+    if (detailOverlay.dataset.currentPet) {
+        detailOverlay.classList.add('show');
+    }
+};
+
+const openConfirmDelete = (petId) => {
+    confirmDeleteOverlay.dataset.deleteId = petId;
+    confirmDeleteOverlay.classList.add('show');
+};
+
+const closeConfirmDelete = () => {
+    confirmDeleteOverlay.classList.remove('show');
+    delete confirmDeleteOverlay.dataset.deleteId;
+};
+
+const getPetCardById = (petId) => document.querySelector(`.pet-card[data-pet-id="${petId}"]`);
+
+const updatePetCard = (pet) => {
+    const card = getPetCardById(pet.id);
+    if (!card) return;
+    card.dataset.pet = JSON.stringify(pet);
+    const imageName = pet.image ? pet.image.split('/').pop() : 'default-pet.png';
+    card.querySelector('.pet-image-thumb').src = `uploads/pets/${imageName}`;
+    card.querySelector('.pet-image-thumb').alt = pet.name || 'Pet image';
+    card.querySelector('h3').textContent = pet.name || 'Unnamed pet';
+    card.querySelector('.pet-meta').textContent = `${pet.species || 'Unknown'} · ${pet.breed || 'Unknown breed'}`;
+    card.querySelector('.pet-stats-row span:first-child').textContent = `${pet.age || '0'} yrs`;
+    card.querySelector('.pet-stats-row span:last-child').textContent = pet.color || 'No color';
+    card.querySelector('.pet-card-ribbon span').textContent = pet.vaccination_status && pet.vaccination_status !== 'Unknown' ? pet.vaccination_status : 'Vaccine status pending';
+};
+
+const removePetCard = (petId) => {
+    const card = getPetCardById(petId);
+    if (card) card.remove();
+};
+
+const deletePet = async (petId) => {
+    const formData = new FormData();
+    formData.append('id', petId);
+    const response = await fetch('index.php?url=home/deletePet', {
+        method: 'POST',
+        body: formData
+    });
+    const json = await response.json();
+    if (!json.success) {
+        showToast(json.message || 'Could not delete pet.');
+        return;
+    }
+    removePetCard(petId);
+    closeConfirmDelete();
+    detailOverlay.classList.remove('show');
+    showToast(json.message || 'Pet deleted successfully.');
+};
+
+if (openPetModalButton) {
+    openPetModalButton.addEventListener('click', showPetModal);
+}
+
+if (closePetModal) {
+    closePetModal.addEventListener('click', hidePetModal);
+}
+
+if (cancelPetModal) {
+    cancelPetModal.addEventListener('click', hidePetModal);
+}
+
+if (closeDetailModal) {
+    closeDetailModal.addEventListener('click', () => detailOverlay.classList.remove('show'));
+}
+
+if (detailEditButton) {
+    detailEditButton.addEventListener('click', () => {
+        const currentPetId = detailOverlay.dataset.currentPet;
+        const card = getPetCardById(currentPetId);
+        if (!card) return;
+        const petData = card.getAttribute('data-pet');
+        if (!petData) return;
+        try {
+            const pet = JSON.parse(petData);
+            openEditModal(pet);
+        } catch (error) {
+            console.error('Failed to parse pet data', error);
+        }
+    });
+}
+
+if (detailDeleteButton) {
+    detailDeleteButton.addEventListener('click', () => {
+        const currentPetId = detailOverlay.dataset.currentPet;
+        if (currentPetId) {
+            openConfirmDelete(currentPetId);
+        }
+    });
+}
+
+if (closeEditModal) {
+    closeEditModal.addEventListener('click', closeEditOverlay);
+}
+
+if (cancelEditButton) {
+    cancelEditButton.addEventListener('click', closeEditOverlay);
+}
+
+if (cancelDeleteButton) {
+    cancelDeleteButton.addEventListener('click', closeConfirmDelete);
+}
+
+if (confirmDeleteButton) {
+    confirmDeleteButton.addEventListener('click', () => {
+        const petId = confirmDeleteOverlay.dataset.deleteId;
+        if (petId) {
+            deletePet(petId);
+        }
+    });
+}
+
+if (petsGrid) {
+    petsGrid.addEventListener('click', (event) => {
+        const detailButton = event.target.closest('.view-details-btn');
+        if (!detailButton) return;
+        const petCard = detailButton.closest('.pet-card');
+        if (!petCard) return;
+
+        const petData = petCard.getAttribute('data-pet');
+        if (!petData) return;
+
+        try {
+            const pet = JSON.parse(petData);
+            showPetDetails(pet);
+        } catch (error) {
+            console.error('Failed to parse pet data', error);
+        }
+    });
+}
+
+if (petModalBackdrop) {
+    petModalBackdrop.addEventListener('click', (event) => {
+        if (event.target === petModalBackdrop) {
+            hidePetModal();
+        }
+    });
+}
+
+if (detailOverlay) {
+    detailOverlay.addEventListener('click', (event) => {
+        if (event.target === detailOverlay) {
+            detailOverlay.classList.remove('show');
+        }
+    });
+}
+
+if (editOverlay) {
+    editOverlay.addEventListener('click', (event) => {
+        if (event.target === editOverlay) {
+            closeEditOverlay();
+        }
+    });
+}
+
+if (confirmDeleteOverlay) {
+    confirmDeleteOverlay.addEventListener('click', (event) => {
+        if (event.target === confirmDeleteOverlay) {
+            closeConfirmDelete();
+        }
+    });
+}
+
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+        if (petModalBackdrop.classList.contains('show')) hidePetModal();
+        if (detailOverlay.classList.contains('show')) detailOverlay.classList.remove('show');
+    }
+});
+
+if (petImageInput) {
+    petImageInput.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (!file) {
+            petPreviewImg.src = defaultPetPlaceholder;
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+            petPreviewImg.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+if (uploadDropzone) {
+    uploadDropzone.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        uploadDropzone.classList.add('dragover');
+    });
+
+    uploadDropzone.addEventListener('dragleave', (event) => {
+        event.preventDefault();
+        uploadDropzone.classList.remove('dragover');
+    });
+
+    uploadDropzone.addEventListener('drop', (event) => {
+        event.preventDefault();
+        uploadDropzone.classList.remove('dragover');
+        const files = event.dataTransfer.files;
+        if (files.length > 0 && files[0].type.startsWith('image/')) {
+            petImageInput.files = files;
+            petImageInput.dispatchEvent(new Event('change'));
+        } else {
+            showToast('Please drop a valid image file.');
+        }
+    });
+}
+
+if (editUploadDropzone) {
+    editUploadDropzone.addEventListener('click', () => {
+        editPetImage.click();
+    });
+    editUploadDropzone.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        editUploadDropzone.classList.add('dragover');
+    });
+    editUploadDropzone.addEventListener('dragleave', (event) => {
+        event.preventDefault();
+        editUploadDropzone.classList.remove('dragover');
+    });
+    editUploadDropzone.addEventListener('drop', (event) => {
+        event.preventDefault();
+        editUploadDropzone.classList.remove('dragover');
+        const files = event.dataTransfer.files;
+        if (files.length > 0 && files[0].type.startsWith('image/')) {
+            editPetImage.files = files;
+            editPetImage.dispatchEvent(new Event('change'));
+        } else {
+            showToast('Please drop a valid image file.');
+        }
+    });
+}
+
+if (deleteFromEditButton) {
+    deleteFromEditButton.addEventListener('click', () => {
+        const petId = editPetId.value;
+        const petName = editPetName.value;
+        if (confirm(`Are you sure you want to delete ${petName}? This action cannot be undone.`)) {
+            deletePet(petId);
+        }
+    });
+}
+
+if (editPetImage) {
+    editPetImage.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (!file) {
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+            editPetImagePreview.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+if (addPetForm) {
+    addPetForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const formData = new FormData(addPetForm);
+        const response = await fetch('index.php?url=home/addPet', {
+            method: 'POST',
+            body: formData
+        });
+
+        const json = await response.json();
+        if (!json.success) {
+            showToast(json.message || 'Could not add pet.');
+            return;
+        }
+
+        const newPet = json.pet;
+        const card = document.createElement('article');
+        card.className = 'pet-card';
+        card.dataset.petId = newPet.id;
+        card.dataset.pet = JSON.stringify(newPet);
+        card.innerHTML = `
+            <div class="pet-card-ribbon"><span>${escapeHtml(newPet.vaccination_status !== 'Unknown' && newPet.vaccination_status ? newPet.vaccination_status : 'Vaccine status pending')}</span></div>
+            <div class="pet-image"><img src="uploads/pets/${escapeHtml(newPet.image || 'default-pet.png')}" alt="${escapeHtml(newPet.name)}" class="pet-image-thumb" onerror="this.onerror=null;this.src='uploads/pets/default-pet.png'"></div>
+            <h3>${escapeHtml(newPet.name)}</h3>
+            <p class="pet-meta">${escapeHtml(newPet.species)} · ${escapeHtml(newPet.breed || 'Unknown breed')}</p>
+            <div class="pet-stats-row">
+                <span>${escapeHtml(String(newPet.age || '0'))} yrs</span>
+                <span>${escapeHtml(newPet.color || 'No color')}</span>
+            </div>
+            <button type="button" class="view-details-btn">View Details <i class="fas fa-arrow-right"></i></button>
+        `;
+
+        const existingEmpty = document.querySelector('.empty-pets-state');
+        if (existingEmpty) {
+            existingEmpty.remove();
+        }
+
+        petsGrid.insertBefore(card, openPetModalButton);
+        hidePetModal();
+        showToast(json.message || 'Pet added successfully 🐾');
+    });
+}
+
+if (editPetForm) {
+    editPetForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const formData = new FormData(editPetForm);
+        const response = await fetch('index.php?url=home/editPet', {
+            method: 'POST',
+            body: formData
+        });
+
+        const json = await response.json();
+        if (!json.success) {
+            showToast(json.message || 'Could not update pet.');
+            return;
+        }
+
+        const updatedPet = json.pet;
+        updatePetCard(updatedPet);
+        closeEditOverlay();
+        showToast(json.message || 'Pet details updated successfully.');
+        if (detailOverlay.classList.contains('show') && detailOverlay.dataset.currentPet === String(updatedPet.id)) {
+            showPetDetails(updatedPet);
+        }
+    });
+}
+
+function escapeHtml(text) {
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+</script>
 
 </body>
 </html>

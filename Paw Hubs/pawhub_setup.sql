@@ -202,7 +202,15 @@ CREATE TABLE `pets` (
   `owner_id` int(11) NOT NULL,
   `name` varchar(50) NOT NULL,
   `species` varchar(50) NOT NULL,
+  `breed` varchar(100) DEFAULT '',
   `age` int(11) NOT NULL,
+  `gender` varchar(20) DEFAULT 'Unknown',
+  `weight` decimal(5,2) NOT NULL DEFAULT 0.00,
+  `color` varchar(50) DEFAULT '',
+  `medical_notes` text,
+  `vaccination_status` varchar(50) DEFAULT 'Unknown',
+  `image` varchar(255) DEFAULT 'default-pet.png',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `is_for_adoption` tinyint(1) DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 

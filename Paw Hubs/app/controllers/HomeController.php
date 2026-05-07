@@ -71,6 +71,343 @@ class HomeController extends Controller {
         ]);
     }
 
+    public function addPet() {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_SESSION['user_id'])) {
+            http_response_code(403);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Unauthorized request.']);
+            exit;
+        }
+
+        $db = Database::getInstance()->getConnection();
+        $userId = $_SESSION['user_id'];
+
+        $owner = $this->fetchOne($db, "SELECT id FROM pet_owners WHERE user_id = ?", [$userId]);
+        if (!$owner) {
+            $stmt = $db->prepare("INSERT INTO pet_owners (user_id, address) VALUES (?, '')");
+            $stmt->execute([$userId]);
+            $ownerId = $db->lastInsertId();
+        } else {
+            $ownerId = $owner['id'];
+        }
+
+        $name = trim($_POST['name'] ?? '');
+        $species = trim($_POST['species'] ?? '');
+        $breed = trim($_POST['breed'] ?? '');
+        $age = max(0, (int) ($_POST['age'] ?? 0));
+        $gender = trim($_POST['gender'] ?? 'Unknown');
+        $weight = trim($_POST['weight'] ?? '0');
+        $weight = is_numeric($weight) ? number_format((float) $weight, 2, '.', '') : '0.00';
+        $color = trim($_POST['color'] ?? '');
+        $vaccinationStatus = trim($_POST['vaccination_status'] ?? 'Unknown');
+        $medicalNotes = trim($_POST['medical_notes'] ?? '');
+        $imageName = 'default-pet.png';
+
+        $allowedSpecies = ['Dog', 'Cat', 'Bird', 'Other'];
+        $allowedGenders = ['Male', 'Female', 'Unknown', 'Other'];
+
+        $species = ucfirst(strtolower($species));
+        $gender = ucfirst(strtolower($gender));
+
+        if ($name === '' || !in_array($species, $allowedSpecies, true)) {
+            http_response_code(400);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Pet name and species are required.']);
+            exit;
+        }
+
+        if ($age < 0) {
+            http_response_code(400);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Age must be a positive number.']);
+            exit;
+        }
+
+        if (!in_array($gender, $allowedGenders, true)) {
+            $gender = 'Unknown';
+        }
+
+        if (isset($_FILES['pet_image']) && $_FILES['pet_image']['error'] !== UPLOAD_ERR_NO_FILE) {
+            $file = $_FILES['pet_image'];
+            $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+            $allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
+
+            if ($file['error'] !== UPLOAD_ERR_OK || $file['size'] <= 0) {
+                http_response_code(400);
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'message' => 'Upload failed.']);
+                exit;
+            }
+
+            if (!in_array($ext, $allowedExtensions, true)) {
+                http_response_code(400);
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'message' => 'Supported image types: jpg, jpeg, png, webp.']);
+                exit;
+            }
+
+            $uploadDir = dirname(__DIR__, 2) . '/public/uploads/pets/';
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0755, true);
+            }
+
+            $imageName = 'pet_' . $ownerId . '_' . time() . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
+            $destination = $uploadDir . $imageName;
+            if (!move_uploaded_file($file['tmp_name'], $destination)) {
+                $imageName = 'default-pet.png';
+            }
+        }
+
+        try {
+            $stmt = $db->prepare(
+                "INSERT INTO pets (owner_id, name, species, breed, age, gender, weight, color, vaccination_status, medical_notes, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            );
+            $stmt->execute([
+                $ownerId,
+                $name,
+                $species,
+                $breed,
+                $age,
+                $gender,
+                $weight,
+                $color,
+                $vaccinationStatus,
+                $medicalNotes,
+                $imageName
+            ]);
+
+            $petId = $db->lastInsertId();
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => true,
+                'message' => 'Pet added successfully 🐾',
+                'pet' => [
+                    'id' => $petId,
+                    'owner_id' => $ownerId,
+                    'name' => $name,
+                    'species' => $species,
+                    'breed' => $breed,
+                    'age' => $age,
+                    'gender' => $gender,
+                    'weight' => $weight,
+                    'color' => $color,
+                    'vaccination_status' => $vaccinationStatus,
+                    'medical_notes' => $medicalNotes,
+                    'image' => $imageName,
+                    'created_at' => date('Y-m-d H:i:s'),
+                ]
+            ]);
+        } catch (PDOException $e) {
+            http_response_code(500);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Could not save pet.']);
+        }
+        exit;
+    }
+
+    public function editPet() {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_SESSION['user_id'])) {
+            http_response_code(403);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Unauthorized request.']);
+            exit;
+        }
+
+        $db = Database::getInstance()->getConnection();
+        $userId = $_SESSION['user_id'];
+        $petId = (int) ($_POST['id'] ?? 0);
+
+        if ($petId <= 0) {
+            http_response_code(400);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Invalid pet identifier.']);
+            exit;
+        }
+
+        $owner = $this->fetchOne($db, "SELECT o.id FROM pet_owners o JOIN pets p ON p.owner_id = o.id WHERE o.user_id = ? AND p.id = ?", [$userId, $petId]);
+        if (!$owner) {
+            http_response_code(403);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Pet not found or not owned by current user.']);
+            exit;
+        }
+
+        $name = trim($_POST['name'] ?? '');
+        $species = ucfirst(strtolower(trim($_POST['species'] ?? '')));
+        $breed = trim($_POST['breed'] ?? '');
+        $age = max(0, (int) ($_POST['age'] ?? 0));
+        $gender = ucfirst(strtolower(trim($_POST['gender'] ?? 'Unknown')));
+        $weight = trim($_POST['weight'] ?? '0');
+        $weight = is_numeric($weight) ? number_format((float) $weight, 2, '.', '') : '0.00';
+        $color = trim($_POST['color'] ?? '');
+        $vaccinationStatus = trim($_POST['vaccination_status'] ?? 'Unknown');
+        $medicalNotes = trim($_POST['medical_notes'] ?? '');
+
+        $allowedSpecies = ['Dog', 'Cat', 'Bird', 'Other'];
+        $allowedGenders = ['Male', 'Female', 'Unknown', 'Other'];
+
+        if ($name === '' || !in_array($species, $allowedSpecies, true)) {
+            http_response_code(400);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Pet name and species are required.']);
+            exit;
+        }
+
+        if ($age < 0) {
+            http_response_code(400);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Age must be a positive number.']);
+            exit;
+        }
+
+        if (!in_array($gender, $allowedGenders, true)) {
+            $gender = 'Unknown';
+        }
+
+        $pet = $this->fetchOne($db, "SELECT image FROM pets WHERE id = ? AND owner_id = ?", [$petId, $owner['id']]);
+        if (!$pet) {
+            http_response_code(404);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Pet record not found.']);
+            exit;
+        }
+
+        $imageName = $pet['image'] ?: 'default-pet.png';
+        if (isset($_FILES['pet_image']) && $_FILES['pet_image']['error'] !== UPLOAD_ERR_NO_FILE) {
+            $file = $_FILES['pet_image'];
+            $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+            $allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
+
+            if ($file['error'] !== UPLOAD_ERR_OK || $file['size'] <= 0) {
+                http_response_code(400);
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'message' => 'Upload failed.']);
+                exit;
+            }
+
+            if (!in_array($ext, $allowedExtensions, true)) {
+                http_response_code(400);
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'message' => 'Supported image types: jpg, jpeg, png, webp.']);
+                exit;
+            }
+
+            $uploadDir = dirname(__DIR__, 2) . '/public/uploads/pets/';
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0755, true);
+            }
+
+            $newImageName = 'pet_' . $petId . '_' . time() . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
+            $destination = $uploadDir . $newImageName;
+            if (move_uploaded_file($file['tmp_name'], $destination)) {
+                if ($imageName !== 'default-pet.png' && file_exists($uploadDir . $imageName)) {
+                    @unlink($uploadDir . $imageName);
+                }
+                $imageName = $newImageName;
+            }
+        }
+
+        try {
+            $stmt = $db->prepare(
+                "UPDATE pets SET name = ?, species = ?, breed = ?, age = ?, gender = ?, weight = ?, color = ?, vaccination_status = ?, medical_notes = ?, image = ? WHERE id = ? AND owner_id = ?"
+            );
+            $stmt->execute([
+                $name,
+                $species,
+                $breed,
+                $age,
+                $gender,
+                $weight,
+                $color,
+                $vaccinationStatus,
+                $medicalNotes,
+                $imageName,
+                $petId,
+                $owner['id']
+            ]);
+
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => true,
+                'message' => 'Pet updated successfully.',
+                'pet' => [
+                    'id' => $petId,
+                    'owner_id' => $owner['id'],
+                    'name' => $name,
+                    'species' => $species,
+                    'breed' => $breed,
+                    'age' => $age,
+                    'gender' => $gender,
+                    'weight' => $weight,
+                    'color' => $color,
+                    'vaccination_status' => $vaccinationStatus,
+                    'medical_notes' => $medicalNotes,
+                    'image' => $imageName,
+                ]
+            ]);
+        } catch (PDOException $e) {
+            http_response_code(500);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Could not update pet.']);
+        }
+        exit;
+    }
+
+    public function deletePet() {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_SESSION['user_id'])) {
+            http_response_code(403);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Unauthorized request.']);
+            exit;
+        }
+
+        $db = Database::getInstance()->getConnection();
+        $userId = $_SESSION['user_id'];
+        $petId = (int) ($_POST['id'] ?? 0);
+
+        if ($petId <= 0) {
+            http_response_code(400);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Invalid pet identifier.']);
+            exit;
+        }
+
+        $owner = $this->fetchOne($db, "SELECT o.id FROM pet_owners o JOIN pets p ON p.owner_id = o.id WHERE o.user_id = ? AND p.id = ?", [$userId, $petId]);
+        if (!$owner) {
+            http_response_code(403);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Pet not found or not owned by current user.']);
+            exit;
+        }
+
+        $pet = $this->fetchOne($db, "SELECT image FROM pets WHERE id = ? AND owner_id = ?", [$petId, $owner['id']]);
+        if (!$pet) {
+            http_response_code(404);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Pet record not found.']);
+            exit;
+        }
+
+        try {
+            $stmt = $db->prepare("DELETE FROM pets WHERE id = ? AND owner_id = ?");
+            $stmt->execute([$petId, $owner['id']]);
+
+            $uploadDir = dirname(__DIR__, 2) . '/public/uploads/pets/';
+            $imageName = $pet['image'] ?: 'default-pet.png';
+            if ($imageName !== 'default-pet.png' && file_exists($uploadDir . $imageName)) {
+                @unlink($uploadDir . $imageName);
+            }
+
+            header('Content-Type: application/json');
+            echo json_encode([ 'success' => true, 'message' => 'Pet deleted successfully.' ]);
+        } catch (PDOException $e) {
+            http_response_code(500);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Could not remove pet.']);
+        }
+        exit;
+    }
+
     private function fetchOne($db, $sql, $params = []) {
         $stmt = $db->prepare($sql);
         $stmt->execute($params);
