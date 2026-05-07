@@ -146,15 +146,13 @@ class HomeController extends Controller {
                 exit;
             }
 
-            $uploadDir = dirname(__DIR__, 2) . '/public/uploads/pets/';
-            if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0755, true);
-            }
-
             $imageName = 'pet_' . $ownerId . '_' . time() . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
-            $destination = $uploadDir . $imageName;
-            if (!move_uploaded_file($file['tmp_name'], $destination)) {
-                $imageName = 'default-pet.png';
+            $uploadError = $this->savePetImageUpload($file['tmp_name'], $imageName);
+            if ($uploadError !== null) {
+                http_response_code(500);
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'message' => $uploadError]);
+                exit;
             }
         }
 
@@ -177,6 +175,13 @@ class HomeController extends Controller {
             ]);
 
             $petId = $db->lastInsertId();
+            $this->createUserNotification(
+                $db,
+                $userId,
+                'Pet Added',
+                sprintf('%s was added to your pets successfully.', $name),
+                'pet_added'
+            );
             header('Content-Type: application/json');
             echo json_encode([
                 'success' => true,
@@ -292,17 +297,16 @@ class HomeController extends Controller {
                 exit;
             }
 
-            $uploadDir = dirname(__DIR__, 2) . '/public/uploads/pets/';
-            if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0755, true);
-            }
-
             $newImageName = 'pet_' . $petId . '_' . time() . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
-            $destination = $uploadDir . $newImageName;
-            if (move_uploaded_file($file['tmp_name'], $destination)) {
-                if ($imageName !== 'default-pet.png' && file_exists($uploadDir . $imageName)) {
-                    @unlink($uploadDir . $imageName);
-                }
+            $uploadError = $this->savePetImageUpload($file['tmp_name'], $newImageName);
+            if ($uploadError !== null) {
+                http_response_code(500);
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'message' => $uploadError]);
+                exit;
+            }
+            $this->deletePetImageFiles($imageName);
+            if ($newImageName !== '') {
                 $imageName = $newImageName;
             }
         }
@@ -325,6 +329,13 @@ class HomeController extends Controller {
                 $petId,
                 $owner['id']
             ]);
+            $this->createUserNotification(
+                $db,
+                $userId,
+                'Pet Updated',
+                sprintf('%s profile details were updated.', $name),
+                'pet_updated'
+            );
 
             header('Content-Type: application/json');
             echo json_encode([
@@ -392,11 +403,15 @@ class HomeController extends Controller {
             $stmt = $db->prepare("DELETE FROM pets WHERE id = ? AND owner_id = ?");
             $stmt->execute([$petId, $owner['id']]);
 
-            $uploadDir = dirname(__DIR__, 2) . '/public/uploads/pets/';
             $imageName = $pet['image'] ?: 'default-pet.png';
-            if ($imageName !== 'default-pet.png' && file_exists($uploadDir . $imageName)) {
-                @unlink($uploadDir . $imageName);
-            }
+            $this->deletePetImageFiles($imageName);
+            $this->createUserNotification(
+                $db,
+                $userId,
+                'Pet Deleted',
+                'A pet profile was removed from your account.',
+                'pet_deleted'
+            );
 
             header('Content-Type: application/json');
             echo json_encode([ 'success' => true, 'message' => 'Pet deleted successfully.' ]);
@@ -412,6 +427,75 @@ class HomeController extends Controller {
         $stmt = $db->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+    private function createUserNotification($db, $userId, $title, $message, $type) {
+        if (!$userId) {
+            return;
+        }
+
+        try {
+            $stmt = $db->prepare(
+                "INSERT INTO notifications (user_id, title, message, type, is_read)
+                 VALUES (?, ?, ?, ?, 0)"
+            );
+            $stmt->execute([$userId, $title, $message, $type]);
+        } catch (PDOException $e) {
+            return;
+        }
+    }
+
+    private function petUploadDirectories() {
+        $directories = [];
+        $primary = dirname(__DIR__, 2) . '/public/uploads/pets/';
+        $directories[] = $primary;
+
+        $legacy = dirname(dirname(__DIR__, 2)) . '/public/uploads/pets/';
+        if ($legacy !== $primary) {
+            $directories[] = $legacy;
+        }
+
+        return $directories;
+    }
+
+    private function savePetImageUpload($tmpPath, $imageName) {
+        $directories = $this->petUploadDirectories();
+        $copied = false;
+
+        foreach ($directories as $index => $directory) {
+            if (!is_dir($directory)) {
+                mkdir($directory, 0755, true);
+            }
+
+            $destination = $directory . $imageName;
+            if ($index === 0) {
+                if (!move_uploaded_file($tmpPath, $destination)) {
+                    return 'Could not save the uploaded pet image.';
+                }
+                $copied = true;
+                continue;
+            }
+
+            if ($copied && is_file($directories[0] . $imageName)) {
+                @copy($directories[0] . $imageName, $destination);
+            }
+        }
+
+        return null;
+    }
+
+    private function deletePetImageFiles($imageName) {
+        $imageName = trim((string) $imageName);
+        if ($imageName === '' || $imageName === 'default-pet.png') {
+            return;
+        }
+
+        foreach ($this->petUploadDirectories() as $directory) {
+            $path = $directory . basename($imageName);
+            if (is_file($path)) {
+                @unlink($path);
+            }
+        }
     }
 
     private function fetchAll($db, $sql, $params = []) {

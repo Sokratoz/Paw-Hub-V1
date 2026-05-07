@@ -1,3 +1,17 @@
+<?php
+if (!function_exists('asset')) {
+    function asset($path) {
+        $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '')), '/');
+        if ($base === '/' || $base === '.') {
+            $base = '';
+        }
+        return $base . '/' . ltrim($path, '/');
+    }
+}
+
+$petUploadsBase = asset('uploads/pets');
+$defaultPetImage = asset('images/guest.png');
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1410,7 +1424,7 @@ $displayPets = $pets;
                     <?php
                     $petImage = trim((string) ($pet['image'] ?? ''));
                     $petImage = pathinfo($petImage, PATHINFO_BASENAME);
-                    $petImage = $petImage !== '' ? 'uploads/pets/' . htmlspecialchars($petImage) : 'uploads/pets/default-pet.png';
+                    $petImage = $petImage !== '' ? $petUploadsBase . '/' . htmlspecialchars($petImage) : $defaultPetImage;
                     $petData = htmlspecialchars(json_encode($pet), ENT_QUOTES, 'UTF-8');
                     $badgeText = !empty($pet['vaccination_status']) && strtolower($pet['vaccination_status']) !== 'unknown'
                         ? htmlspecialchars($pet['vaccination_status'])
@@ -1419,7 +1433,7 @@ $displayPets = $pets;
                     <article class="pet-card" data-pet-id="<?= (int) $pet['id'] ?>" data-pet='<?= $petData ?>'>
                         <div class="pet-card-ribbon"><span><?= $badgeText ?></span></div>
                         <div class="pet-image">
-                            <img src="<?= $petImage ?>" alt="<?= htmlspecialchars($pet['name']) ?>" class="pet-image-thumb" onerror="this.onerror=null;this.src='uploads/pets/default-pet.png'">
+                            <img src="<?= $petImage ?>" alt="<?= htmlspecialchars($pet['name']) ?>" class="pet-image-thumb" onerror="this.onerror=null;this.src='<?= htmlspecialchars($defaultPetImage, ENT_QUOTES, 'UTF-8') ?>'">
                         </div>
                         <h3><?= htmlspecialchars($pet['name']) ?></h3>
                         <p class="pet-meta"><?= htmlspecialchars($pet['species']) ?> · <?= htmlspecialchars($pet['breed'] ?: 'Unknown breed') ?></p>
@@ -1458,7 +1472,7 @@ $displayPets = $pets;
                             <strong>Upload photo</strong>
                             <span>PNG, JPG or WEBP</span>
                         </div>
-                        <input id="petImageInput" name="pet_image" type="file" accept="image/jpeg,image/png,image/webp">
+                        <input id="petImageInput" name="pet_image" type="file" accept="image/jpeg,image/png,image/webp" form="addPetForm">
                     </label>
                     <p class="upload-note">Use a square or portrait image for the best result.</p>
                 </div>
@@ -1534,7 +1548,7 @@ $displayPets = $pets;
             <div class="pet-detail-content">
                 <div class="pet-detail-left">
                     <div class="pet-detail-image">
-                        <img id="detailPetImage" src="uploads/pets/default-pet.png" alt="Pet image">
+                        <img id="detailPetImage" src="<?= htmlspecialchars($defaultPetImage) ?>" alt="Pet image">
                     </div>
                     <div class="pet-detail-badge" id="detailPetStatus"></div>
                 </div>
@@ -1578,7 +1592,7 @@ $displayPets = $pets;
                             <p>Upload a new image to update your pet's profile picture.</p>
                         </div>
                         <div class="pet-preview">
-                            <img id="editPetImagePreview" src="uploads/pets/default-pet.png" alt="Edit pet image">
+                            <img id="editPetImagePreview" src="<?= htmlspecialchars($defaultPetImage) ?>" alt="Edit pet image">
                         </div>
                         <div class="upload-dropzone" id="editUploadDropzone">
                             <div class="upload-dropzone-inner">
@@ -1586,7 +1600,7 @@ $displayPets = $pets;
                                 <strong>Upload New Image</strong>
                                 <span>Drag & drop or click to select</span>
                             </div>
-                            <input type="file" name="pet_image" id="editPetImage" accept="image/*">
+                            <input type="file" name="pet_image" id="editPetImage" accept="image/*" form="editPetForm">
                         </div>
                         <p class="upload-note">Supported formats: JPG, PNG, WebP. Max size: 5MB.</p>
                     </div>
@@ -1669,7 +1683,7 @@ $displayPets = $pets;
         </div>
     </div>
 
-    <div class="toast-message" id="petToast"></div>
+    <div class="toast-message" id="petToast" role="status" aria-live="polite"></div>
 
     <!-- Marketplace section -->
     <section class="panel marketplace-section" aria-labelledby="marketplace-title">
@@ -1940,8 +1954,13 @@ const editColor = document.getElementById('editColor');
 const editVaccination = document.getElementById('editVaccination');
 const editMedicalNotes = document.getElementById('editMedicalNotes');
 const editPetImage = document.getElementById('editPetImage');
+const editPetImagePreview = document.getElementById('editPetImagePreview');
 const editUploadDropzone = document.getElementById('editUploadDropzone');
 const deleteFromEditButton = document.getElementById('deleteFromEditButton');
+const navbarNotificationToggle = document.getElementById('notificationToggle');
+const navbarNotificationsDropdown = document.getElementById('notificationsDropdown');
+const petUploadsBase = <?= json_encode($petUploadsBase) ?>;
+const defaultPetImage = <?= json_encode($defaultPetImage) ?>;
 const defaultPetPlaceholder = 'data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 400 400%27%3E%3Crect width=%27400%27 height=%27400%27 fill=%27%23f5f7f6%27/%3E%3Ccircle cx=%27200%27 cy=%27208%27 r=%27130%27 fill=%27%23def4ea%27/%3E%3Ccircle cx=%27200%27 cy=%27140%27 r=%2772%27 fill=%27%239ad1b8%27/%3E%3Ccircle cx=%27150%27 cy=%27120%27 r=%2716%27 fill=%27%237fae99%27/%3E%3Ccircle cx=%27250%27 cy=%27120%27 r=%2716%27 fill=%27%237fae99%27/%3E%3C/svg%3E';
 
 const showPetModal = () => {
@@ -1956,17 +1975,67 @@ const hidePetModal = () => {
     petPreviewImg.src = defaultPetPlaceholder;
 };
 
-const showToast = (message) => {
+const buildPetImageUrl = (imageName) => {
+    const cleanName = (imageName || '').toString().split('/').pop().split('\\').pop();
+    return cleanName ? `${petUploadsBase}/${cleanName}` : defaultPetImage;
+};
+
+const showToast = (message, type = 'success') => {
     if (!petToast) return;
     petToast.textContent = message;
+    petToast.dataset.state = type;
     petToast.classList.add('show');
-    window.setTimeout(() => petToast.classList.remove('show'), 3200);
+    window.clearTimeout(showToast.timeoutId);
+    showToast.timeoutId = window.setTimeout(() => petToast.classList.remove('show'), 3200);
+};
+
+const pushNavbarNotification = (title, message) => {
+    if (!navbarNotificationToggle || !navbarNotificationsDropdown) return;
+
+    let badge = navbarNotificationToggle.querySelector('.badge');
+    if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'badge';
+        navbarNotificationToggle.appendChild(badge);
+    }
+
+    const currentCount = parseInt(badge.textContent || '0', 10) || 0;
+    const nextCount = currentCount + 1;
+    badge.textContent = String(nextCount);
+
+    const statusLabel = navbarNotificationsDropdown.querySelector('.notification-card-header span');
+    if (statusLabel) {
+        statusLabel.textContent = `${nextCount} unread`;
+    }
+
+    const list = navbarNotificationsDropdown.querySelector('.notification-list');
+    if (!list) return;
+
+    const empty = list.querySelector('.notification-empty');
+    if (empty) {
+        empty.remove();
+    }
+
+    const item = document.createElement('article');
+    item.className = 'notification-item unread';
+    item.innerHTML = `
+        <div class="notification-body">
+            <div class="notification-title">${escapeHtml(title)}</div>
+            <div class="notification-message">${escapeHtml(message)}</div>
+        </div>
+        <small class="notification-time">Just now</small>
+    `;
+    list.prepend(item);
+
+    while (list.children.length > 10) {
+        list.removeChild(list.lastElementChild);
+    }
 };
 
 const showPetDetails = (pet) => {
-    const imageName = pet.image ? pet.image.split('/').pop() : '';
-    const imageUrl = imageName ? `uploads/pets/${imageName}` : 'uploads/pets/default-pet.png';
+    const imageUrl = buildPetImageUrl(pet.image);
     detailPetImage.src = imageUrl;
+    detailPetImage.onerror = () => { detailPetImage.src = defaultPetImage; };
     detailPetImage.alt = pet.name ? `${pet.name} profile` : 'Pet image';
     detailPetStatus.textContent = pet.vaccination_status && pet.vaccination_status !== 'Unknown' ? pet.vaccination_status : 'Vaccine status pending';
     detailPetTitle.textContent = pet.name || 'Unnamed pet';
@@ -1986,9 +2055,9 @@ const showPetDetails = (pet) => {
 
 const openEditModal = (pet) => {
     detailOverlay.classList.remove('show');
-    const imageName = pet.image ? pet.image.split('/').pop() : '';
-    const imageUrl = imageName ? `uploads/pets/${imageName}` : 'uploads/pets/default-pet.png';
+    const imageUrl = buildPetImageUrl(pet.image);
     editPetImagePreview.src = imageUrl;
+    editPetImagePreview.onerror = () => { editPetImagePreview.src = defaultPetImage; };
     editPetImagePreview.alt = pet.name ? `${pet.name} profile` : 'Pet image';
     editPetId.value = pet.id || '';
     editPetName.value = pet.name || '';
@@ -2027,9 +2096,10 @@ const updatePetCard = (pet) => {
     const card = getPetCardById(pet.id);
     if (!card) return;
     card.dataset.pet = JSON.stringify(pet);
-    const imageName = pet.image ? pet.image.split('/').pop() : 'default-pet.png';
-    card.querySelector('.pet-image-thumb').src = `uploads/pets/${imageName}`;
-    card.querySelector('.pet-image-thumb').alt = pet.name || 'Pet image';
+    const imageEl = card.querySelector('.pet-image-thumb');
+    imageEl.src = buildPetImageUrl(pet.image);
+    imageEl.onerror = () => { imageEl.src = defaultPetImage; };
+    imageEl.alt = pet.name || 'Pet image';
     card.querySelector('h3').textContent = pet.name || 'Unnamed pet';
     card.querySelector('.pet-meta').textContent = `${pet.species || 'Unknown'} · ${pet.breed || 'Unknown breed'}`;
     card.querySelector('.pet-stats-row span:first-child').textContent = `${pet.age || '0'} yrs`;
@@ -2051,13 +2121,14 @@ const deletePet = async (petId) => {
     });
     const json = await response.json();
     if (!json.success) {
-        showToast(json.message || 'Could not delete pet.');
+        showToast(json.message || 'Could not delete pet.', 'error');
         return;
     }
     removePetCard(petId);
     closeConfirmDelete();
     detailOverlay.classList.remove('show');
-    showToast(json.message || 'Pet deleted successfully.');
+    showToast(json.message || 'Pet deleted successfully.', 'success');
+    pushNavbarNotification('Pet Deleted', json.message || 'A pet profile was removed from your account.');
 };
 
 if (openPetModalButton) {
@@ -2214,7 +2285,7 @@ if (uploadDropzone) {
             petImageInput.files = files;
             petImageInput.dispatchEvent(new Event('change'));
         } else {
-            showToast('Please drop a valid image file.');
+            showToast('Please drop a valid image file.', 'error');
         }
     });
 }
@@ -2239,7 +2310,7 @@ if (editUploadDropzone) {
             editPetImage.files = files;
             editPetImage.dispatchEvent(new Event('change'));
         } else {
-            showToast('Please drop a valid image file.');
+            showToast('Please drop a valid image file.', 'error');
         }
     });
 }
@@ -2279,7 +2350,7 @@ if (addPetForm) {
 
         const json = await response.json();
         if (!json.success) {
-            showToast(json.message || 'Could not add pet.');
+            showToast(json.message || 'Could not add pet.', 'error');
             return;
         }
 
@@ -2290,7 +2361,7 @@ if (addPetForm) {
         card.dataset.pet = JSON.stringify(newPet);
         card.innerHTML = `
             <div class="pet-card-ribbon"><span>${escapeHtml(newPet.vaccination_status !== 'Unknown' && newPet.vaccination_status ? newPet.vaccination_status : 'Vaccine status pending')}</span></div>
-            <div class="pet-image"><img src="uploads/pets/${escapeHtml(newPet.image || 'default-pet.png')}" alt="${escapeHtml(newPet.name)}" class="pet-image-thumb" onerror="this.onerror=null;this.src='uploads/pets/default-pet.png'"></div>
+            <div class="pet-image"><img src="${escapeHtml(buildPetImageUrl(newPet.image))}" alt="${escapeHtml(newPet.name)}" class="pet-image-thumb"></div>
             <h3>${escapeHtml(newPet.name)}</h3>
             <p class="pet-meta">${escapeHtml(newPet.species)} · ${escapeHtml(newPet.breed || 'Unknown breed')}</p>
             <div class="pet-stats-row">
@@ -2307,7 +2378,12 @@ if (addPetForm) {
 
         petsGrid.insertBefore(card, openPetModalButton);
         hidePetModal();
-        showToast(json.message || 'Pet added successfully 🐾');
+        const newImage = card.querySelector('.pet-image-thumb');
+        if (newImage) {
+            newImage.onerror = () => { newImage.src = defaultPetImage; };
+        }
+        showToast(json.message || 'Pet added successfully.', 'success');
+        pushNavbarNotification('Pet Added', `${newPet.name || 'Your pet'} was added to your pets successfully.`);
     });
 }
 
@@ -2322,14 +2398,15 @@ if (editPetForm) {
 
         const json = await response.json();
         if (!json.success) {
-            showToast(json.message || 'Could not update pet.');
+            showToast(json.message || 'Could not update pet.', 'error');
             return;
         }
 
         const updatedPet = json.pet;
         updatePetCard(updatedPet);
         closeEditOverlay();
-        showToast(json.message || 'Pet details updated successfully.');
+        showToast(json.message || 'Pet details updated successfully.', 'success');
+        pushNavbarNotification('Pet Updated', `${updatedPet.name || 'Your pet'} profile details were updated.`);
         if (detailOverlay.classList.contains('show') && detailOverlay.dataset.currentPet === String(updatedPet.id)) {
             showPetDetails(updatedPet);
         }
